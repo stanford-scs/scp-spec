@@ -252,29 +252,50 @@ monotonically-growing sets of values.
 
 `votes` consists of candidate values nominated by the sender.  Each
 node progresses through a series of nomination _rounds_ in which it
-potentially adds more and more values to `votes` by repeating `votes`
-from a growing set of peers.  Each node computes the set of peers
-whose nomination `votes` it should echo based on its quorum slices as
-follows for round `n` of slot `i`:
+potentially adds more and more values to `votes` by adding `votes` for
+valid values received from a growing set of peers to its own set of
+`votes`.  Each node computes the set of peers whose nomination `votes`
+it should echo based on its quorum slices as follows for round `n` of
+slot `i`:
 
-* Let Gi(m) = SHA-256(i || output[i-1] || m), where output[i-1] is the
-  consensus output of slot i-1 or the zero-byte value for slot 0.
+* Let `Gi(m) = SHA-256(i || output[i-1] || m)`, where `output[i-1]` is
+  the consensus output of slot i-1 or the zero-byte value for slot 0.
   (Recall values are encoded as an XDR opaque vector, with a 32-byte
   length followed by bytes padded to a multiple of 4 bytes.)  Treat
-  the output of Gi as a 256-bit binary number in big-endian format.
+  the output of `Gi` as a 256-bit binary number in big-endian format.
 
-* For each peer v, define weight(v) as the faction of quorum slices
-  containing v.
+* For each peer `v`, define `weight(v)` as the faction of quorum
+  slices containing `v`.
 
-* Define the set of nodes neighbors(n) as the set of nodes v for which
-  Gi("N" || n || v) < 2^{256}-1 * weight(v).
+* Define the set of nodes `neighbors(n)` as the set of nodes v for
+  which `Gi("N" || n || v) < 2^{256}-1 * weight(v)`.
 
-* Define priority(n, v) as Gi("P" || n || v).
+* Define `priority(n, v)` as `Gi("P" || n || v)`.
 
-Each node picks the available peer with the highest value of priority
-in the given round and re-nominates its value.  When a node finds
-itself to have the highest priority, it nominates it unilaterally
-nominates its own input value.
+For each round `n` until nomination starts, a node picks the available
+peer `v` with the highest value of priority in the given round from
+among the nodes in `neighbors(n)`, and adds any values in that node's
+`votes` set to its own `votes` set.  Round `n` lasts for `2+n`
+seconds, after which if nomination has not finished (see below), a
+node proceeds to round `n+1`.
+
+If a particular valid value `x` reaches quorum threshold in the
+messages sent by peers (meaning that every node in a quorum contains
+`x` either in the `votes` or the `accepted` field), then a node moves
+`x` from its `votes` field to its `accepted` field and broadcasts a
+new `SCPNomination` message.  Similarly, if `x` reaches blocking
+threshold in a node's peers' `accepted` field (meaning every one of a
+node's quorum slices contains at least one node with `x` in its
+`accepted` field), then the node adds `x` to its `accepted` field
+(removing it from `votes` if applicable).
+
+The nomination process terminates at a node when any value `x` reaches
+quorum threshold in the `accepted` fields, meaning every node in a
+quorum that includes the node has sent a signed `SCPNomination`
+message in which the `accepted` field contains `x`.  Once nomination
+terminates, nodes stop adding new values to their `votes` sets, but
+potentially continues adding new values to `accepted` as previously
+described.
 
 
 ## Messages
