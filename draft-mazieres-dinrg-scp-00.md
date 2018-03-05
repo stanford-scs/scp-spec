@@ -12,7 +12,7 @@
 % [[author]]
 % initials="N."
 % surname="Barry"
-% fullname="Nickolas Barry"
+% fullname="Nicolas Barry"
 % #role="editor"
 % organization = "Stellar Development Foundation"
 %   [author.address]
