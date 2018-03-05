@@ -14,7 +14,7 @@
 % surname="Barry"
 % fullname="Nickolas Barry"
 % #role="editor"
-% organization = "Stellar"
+% organization = "Stellar Development Foundation"
 %   [author.address]
 %   email = "nicolas@stellar.org"
 %   [author.address.postal]
@@ -42,7 +42,7 @@
 % surname="McCaleb"
 % fullname="Jed McCaleb"
 % #role="editor"
-% organization = "Stellar"
+% organization = "Stellar Development Foundation"
 %   [author.address]
 %   email = "jed@stellar.org"
 %   [author.address.postal]
@@ -346,7 +346,7 @@ The fields have the following meaning:
 * `quorumSetHash` - the SHA-256 hash of the sending node's
   `SCPQuorumSet` structure.
 
-* `ballot` - the current ballot as described above.
+* `ballot` - the current ballot (see below)
 
 * `prepared` - the highest ballot `<n,x>` for which one of the
   following two thresholds has been met:
@@ -368,6 +368,22 @@ The fields have the following meaning:
     * The `prepared` field contains `<n',x>` where `n' >= n`, or
     * The `preparedPrime` field contains `<n',x'>` where `n' >= n` and
       `x'` can be any value.
+
+* `nC` - the counter for the lowest ballot the sender is attempting to
+  confirm (see below).
+
+The latest `ballot` and `nC` values to include in `SCPPrepare`
+messages are tracked as follows:
+
+* Initially, `nc = 0` and `ballot` is `<1,x>` where `x` is the output
+  of the nomination protocol.
+
+* If a node is still sending `SCPPrepare` or `SCPConfirm` messages
+  (meaning it has not yet output a value for a particular slot), then
+  a node arms a timer whenever the current `counter` `n` of the ballot
+  reaches quorum threshold (meaning the node is a member of a quorum
+  in which each member is sending explicit or implicit `SCPPrepare`
+  messages with ballot `counter` >= `n`).
 
 ## Confirm messages
 
