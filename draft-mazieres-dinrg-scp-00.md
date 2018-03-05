@@ -413,9 +413,19 @@ messages.  The first one has the following fields:
 * `ballot` - `<infinity,x>` where `x` is the value from the
   `SCPExternalize` ballot.
 * `nPrepared` - `infinity`
-* `nCommit` -
-* `nH` -
-* `quorumSetHash` - 
+* `nCommit` - the `counter` field from the `SCPExternalize` messages
+  `commit` field.
+* `nH` - `infinity`
+* `quorumSetHash` - the `commitQuorumSetHash` from the
+  `SCPExternalize` message.
+
+The second one has the same fields as the first, except for the last
+two:
+
+* `nH` - the `nH` value from the `SCPExternalize` message
+* `quorumSetHash` - a trivial `SCPQuorumSet` that contains a single
+  slice whose only member is the sender of the `SCPExternalize`
+  message
 
 
 ## Message envelopes
@@ -463,7 +473,16 @@ struct SCPEnvelope
 
 # Security considerations
 
+If nodes do not pick quorum slices well, the protocol will not be
+safe.
+
 # Acknowledgments
+
+The Stellar development foundation supported development of the
+protocol and produced the first production deployment of SCP.  The
+IRTF DIN group including Dirk Kutscher, Sydney Li, Colin Man, Melinda
+Shore, and Jean-Luc Watson helped with the framing and motivation for
+this specification.
 
 {{reference.scp.xml}}
 
