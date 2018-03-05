@@ -297,8 +297,7 @@ terminates, nodes stop adding new values to their `votes` sets, but
 potentially continues adding new values to `accepted` as previously
 described.
 
-
-## Messages
+## Prepare messages
 
 ~~~~~ {.xdr}
 struct SCPBallot
@@ -307,6 +306,50 @@ struct SCPBallot
     Value value;    // x
 };
 
+struct SCPPrepare
+{
+    Hash quorumSetHash;       // D
+    SCPBallot ballot;         // b
+    SCPBallot* prepared;      // p
+    SCPBallot* preparedPrime; // p'
+    uint32 nC;                // c.n
+    uint32 nH;                // h.n
+};
+~~~~~
+
+## Confirm messages
+
+~~~~~ {.xdr}
+struct SCPConfirm
+{
+    SCPBallot ballot;   // b
+    uint32 nPrepared;   // p.n
+    uint32 nCommit;     // c.n
+    uint32 nH;          // h.n
+    Hash quorumSetHash; // D
+};
+~~~~~
+
+## Externalize messages
+
+~~~~~ {.xdr}
+struct SCPExternalize
+{
+    SCPBallot commit;         // c
+    uint32 nH;                // h.n
+    Hash commitQuorumSetHash; // D used before EXTERNALIZE
+} externalize;
+~~~~~
+
+## Message envelopes
+
+In order to provide full context for each signed message, all signed
+messages are part of an `SCPStatement` union type that includes the
+`slotIndex` naming the slot to which the message applies, as well as
+the `type` of the message.  A signed message and its signature are
+packed together in an `SCPEnvelope` structure.
+
+~~~~~ {.xdr}
 enum SCPStatementType
 {
     SCP_ST_PREPARE = 0,
@@ -317,37 +360,17 @@ enum SCPStatementType
 
 struct SCPStatement
 {
-    NodeID nodeID;    // v
+    NodeID nodeID;    // v (node signing message)
     uint64 slotIndex; // i
 
     union switch (SCPStatementType type)
     {
     case SCP_ST_PREPARE:
-        struct
-        {
-            Hash quorumSetHash;       // D
-            SCPBallot ballot;         // b
-            SCPBallot* prepared;      // p
-            SCPBallot* preparedPrime; // p'
-            uint32 nC;                // c.n
-            uint32 nH;                // h.n
-        } prepare;
+        SCPPrepare prepare;
     case SCP_ST_CONFIRM:
-        struct
-        {
-            SCPBallot ballot;   // b
-            uint32 nPrepared;   // p.n
-            uint32 nCommit;     // c.n
-            uint32 nH;          // h.n
-            Hash quorumSetHash; // D
-        } confirm;
+        SCPConfirm confirm;
     case SCP_ST_EXTERNALIZE:
-        struct
-        {
-            SCPBallot commit;         // c
-            uint32 nH;                // h.n
-            Hash commitQuorumSetHash; // D used before EXTERNALIZE
-        } externalize;
+        SCPExternalize externalize;
     case SCP_ST_NOMINATE:
         SCPNomination nominate;
     }
@@ -359,9 +382,7 @@ struct SCPEnvelope
     SCPStatement statement;
     Signature signature;
 };
-
 ~~~~~
-
 
 # Security considerations
 
