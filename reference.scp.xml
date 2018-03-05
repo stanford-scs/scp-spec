@@ -1,0 +1,13 @@
+<reference anchor="SCP"
+ target="https://www.stellar.org/papers/stellar-consensus-protocol.pdf">
+
+<front>
+<title>The Stellar Consensus Protocol: A Federated Model for
+Internet-level Consensus</title>
+<author initials='D.' surname='Mazieres' fullname='D. Mazieres'>
+<organization /></author>
+<date year='2015' />
+</front>
+
+  <seriesInfo name="Stellar Development Foundation whitepaper" value="" />
+</reference>
