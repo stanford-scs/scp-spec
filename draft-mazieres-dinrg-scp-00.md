@@ -136,6 +136,18 @@ cryptographic hash of nodes' public keys.
 
 # Protocol
 
+The protocol consists of exchanging digitally-signed messages
+containing nodes' quorum slices.  When multiple nodes send the same
+messages, two thresholds have significance throughout the protocol for
+each node `v`.
+
+* quorum threshold:  When `v` node is a member of a quorum in which
+  every member (including `v`) has issued some signed statement.
+
+* blocking threshold:  When every one of `v`'s quorum slices has a
+  member issuing some signed statement (which doesn't necessarily
+  include `v`).
+
 Message formats are specified using XDR [@!RFC4506].
 
 ## Basic types
@@ -189,16 +201,67 @@ typedef opaque Value<>;
 
 ## Quorum slices
 
+Theoretically a quorum slice can be an arbitrary set of sets of nodes.
+However, it would not be possible to represent an arbitrary predicate
+on sets concisely.  Instead we specify quorum slices as any set of
+k-of-n members, where each of the n members can either be an
+individual node ID, or, recursively, another k-of-n predicate.
+
 ~~~~~ {.xdr}
 // supports things like: A,B,C,(D,E,F),(G,H,(I,J,K,L))
 // only allows 2 levels of nesting
 struct SCPQuorumSet
 {
-    uint32 threshold;
+    uint32 threshold;            // the n in k-of-n
     PublicKey validators<>;
     SCPQuorumSet innerSets<>;
 };
 ~~~~~
+
+## Nomination
+
+Nomination message are sent in the first phase of each slot in an
+attempt to select a value on which to try to agree.
+
+~~~~~ {.xdr}
+struct SCPNomination
+{
+    Hash quorumSetHash; // D
+    Value votes<>;      // X
+    Value accepted<>;   // Y
+};
+~~~~~
+
+As with all messages, the nomination protocol includes a SHA-256 hash
+of the sender's XDR-encoded SCPQuorumSet.  It also includes two
+monotonically-growing sets of values.
+
+`votes` consists of candidate values nominated by the sender.  Each
+node progresses through a series of nomination _rounds_ in which it
+potentially adds more and more values to `votes` by repeating `votes`
+from a growing set of peers.  Each node computes the set of peers
+whose nomination `votes` it should echo based on its quorum slices as
+follows for round `n` of slot `i`:
+
+* Let Gi(m) = SHA-256(i || output[i-1] || m), where output[i-1] is the
+  consensus output of slot i-1 or the zero-byte value for slot 0.
+  (Recall values are encoded as an XDR opaque vector, with a 32-byte
+  length followed by bytes padded to a multiple of 4 bytes.)  Treat
+  the output of Gi as a 256-bit binary number in big-endian format.
+
+* For each peer v, define weight(v) as the faction of quorum slices
+  containing v.
+
+* Define the set of nodes neighbors(n) as the set of nodes v for which
+  Gi("N" || n || v) < 2^{256}-1 * weight(v).
+
+* Define priority(n, v) as Gi("P" || n || v).
+
+Each node picks the available peer with the highest value of priority
+in the given round and re-nominates its value.  When a node finds
+itself to have the highest priority, it nominates it unilaterally
+nominates its own input value.
+
 
 ## Messages
 
@@ -215,13 +278,6 @@ enum SCPStatementType
     SCP_ST_CONFIRM = 1,
     SCP_ST_EXTERNALIZE = 2,
     SCP_ST_NOMINATE = 3
-};
-
-struct SCPNomination
-{
-    Hash quorumSetHash; // D
-    Value votes<>;      // X
-    Value accepted<>;   // Y
 };
 
 struct SCPStatement
