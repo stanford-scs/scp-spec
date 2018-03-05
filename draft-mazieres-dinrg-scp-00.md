@@ -364,26 +364,55 @@ The fields have the following meaning:
 
 * `nH` - the counter from the highest ballot `<n,x>` for which the
   sender is in a quorum in which each member has sent an `SCPPrepare`
-  message with one of the following properties:
+  message with one of the following properties (or `nH = 0` if no such
+  ballot exists):
     * The `prepared` field contains `<n',x>` where `n' >= n`, or
     * The `preparedPrime` field contains `<n',x'>` where `n' >= n` and
       `x'` can be any value.
 
 * `nC` - the counter for the lowest ballot the sender is attempting to
-  confirm (see below).
+  confirm (see below), otherwise 0.
 
-The latest `ballot` and `nC` values to include in `SCPPrepare`
-messages are tracked as follows:
+The `value` field `x` of each ballot is selected as follows.  If `nH =
+0`, then use the deterministic combination function on all values that
+have made it all the way through the nomination protocol to produce a
+candidate value.  Otherwise, use the value `x` associated with the
+ballot that produced `nH`.
 
-* Initially, `nc = 0` and `ballot` is `<1,x>` where `x` is the output
-  of the nomination protocol.
+The `counter` field `n` of each ballot is selected as follows.
+
+* Initially, `n = 1`.
 
 * If a node is still sending `SCPPrepare` or `SCPConfirm` messages
   (meaning it has not yet output a value for a particular slot), then
-  a node arms a timer whenever the current `counter` `n` of the ballot
-  reaches quorum threshold (meaning the node is a member of a quorum
-  in which each member is sending explicit or implicit `SCPPrepare`
-  messages with ballot `counter` >= `n`).
+  a node arms a timer whenever `n` reaches quorum threshold of ballots
+  (meaning the node is a member of a quorum in which each member is
+  sending explicit or implicit `SCPPrepare` messages with ballot
+  `counter` >= `n`).
+
+* If the timer fires, a node increments `n` and determines a new value
+  depending on the latest state of the nomination protocol and `nH`,
+  as discussed above.
+
+* If a `counter` value greater than `n` ever reaches a blocking
+  threshold, then a node immediately disables any pending timer and
+  increases `n` to the blocking `counter` value, recomputing `value`
+  in the usual way.
+
+The value `nC` is maintained based on an internally-maintained "commit
+ballot" `c`, where initially `c = cNULL = <0, NULL>` (for some
+arbitrary or invalid value `NULL`).
+
+* If either `prepared` or `preparedPrime` has `counter` greater than
+  `c`'s and a different `value`, then reset `c = cNULL`.
+
+* If `c = cNULL` and the ballot determining `nH` hasn't been
+  aborted by `prepared` or `preparedPrime`, then set `c` to the lowest
+  ballot containing the value of that (`nH`) ballot that is between
+  `ballot` and the `nH` ballot.
+
+* If some ballot with the same value reaches quorum threshold betwen
+  `c` and the `nH` ballot, move to the confirm phase.
 
 ## Confirm messages
 
