@@ -1,13 +1,13 @@
 % Title = "The Stellar Consensus Protocol (SCP)"
 % abbrev = "scp"
 % category = "exp"
-% docName = "draft-mazieres-scp-00"
+% docName = "draft-mazieres-dinrg-scp-00"
 % ipr= "trust200902"
 % area = "Internet"
 % workgroup = ""
 % keyword = ["consensus"]
 %
-% date = 2018-02-22T00:00:00Z
+% date = 2018-03-05T00:00:00Z
 %
 % [[author]]
 % initials="N."
@@ -59,19 +59,43 @@ SCP is a protocol for Internet-level Byzantine agreement.
 
 # Introduction
 
+Various aspects of Internet infrastructure depend on irreversible and
+transparent updates to data sets such as authenticated mappings
+[cite Li-Man-Watson draft].  Examples include public key certificates
+mapping domain names to public keys, transparency logs [@?RFC6962],
+HSTS [@?RFC6797] and HPKP [@?RFC7469] preload lists.
+
+The Stellar Consensus Protocol (SCP) specified in this draft allows
+various Internet infrastructure stakeholders to collaborate in
+applying irreversible transactions to public state.  SCP is an open
+Byzantine agreement protocol that resists Sybil attacks by allowing
+individual parties to specify minimum quorum memberships in terms of
+specific trusted peers.  Hence, participants can choose specific peers
+they know to be trustworthy and enjoy safety so long as the peers they
+depend on honestly obey the protocol.
+
+# The Model
+
+Each participant or node in the SCP protocol has a digital signature
+key and is named by the corresponding public key, which we term a
+`NodeID`.
+
 # Protocol
 
+XDR [@!RFC4506]
+
+Ed25519 [@!RFC8032]
 
 ~~~~~ {.xdr}
+
+typedef unsigned int uint32;
+typedef int int32;
+typedef unsigned hyper uint64;
+typedef hyper int64;
 
 typedef opaque Hash[32];
 typedef opaque uint256[32];
 
-typedef unsigned int uint32;
-typedef int int32;
-
-typedef unsigned hyper uint64;
-typedef hyper int64;
 
 enum PublicKeyType
 {
@@ -86,6 +110,8 @@ case PUBLIC_KEY_TYPE_ED25519:
 
 // variable size as the size depends on the signature scheme used
 typedef opaque Signature<64>;
+
+
 
 typedef PublicKey NodeID;
 
