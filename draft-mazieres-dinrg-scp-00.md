@@ -50,6 +50,20 @@
 %   city = "San Francisco, CA"
 %   code = "94110"
 %   country = "US"
+%
+% [[author]]
+% initials="S."
+% surname="Polu"
+% fullname="Stanislas Polu"
+% #role="editor"
+% organization = "Stripe Inc."
+%   [author.address]
+%   email = "stan@stripe.com"
+%   [author.address.postal]
+%   street = "185 Berry Street, Suite 550"
+%   city = "San Francisco, CA"
+%   code = "94107"
+%   country = "US"
 
 .# Abstract
 
