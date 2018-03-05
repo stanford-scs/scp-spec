@@ -299,13 +299,37 @@ described.
 
 ## Prepare messages
 
+Once the nomination process is complete, meaning at least one
+`accepted` value has reached quorum threshold, a node moves on to the
+balloting phase of the protocol.  A ballot is a pair of a counter
+(`n`) and candidate value (`x`):
+
 ~~~~~ {.xdr}
 struct SCPBallot
 {
     uint32 counter; // n
     Value value;    // x
 };
+~~~~~
 
+The counter beings at 1, and is incremented to higher numbers if
+ballot 1 fails to reach consensus on an output value.  The value `x`
+begins as the output of the deterministic combining function on all
+values that have achieved quorum threshold in the `accepted` fields of
+`SCPNomination` messages (meaning all values for which the local node
+is part of a quorum in which every node includes the value in the
+`accepted` field of an `SCPNomination` message).  Note, however, that
+`x` may change in subsequent ballots if more values reach this quorum
+threshold (since nomination keeps running in the background, even
+though a node does not add new values to its `votes` field in
+`SCPNomination`).  Moreover, as described below, `x` may change if a
+particular ballot makes it a certain way through the protocol before
+failing.
+
+Once they have selected `x` for a particular ballot, nodes attempt to
+`prepare` the ballot by sending the following message:
+
+~~~~~ {.xdr}
 struct SCPPrepare
 {
     Hash quorumSetHash;       // D
@@ -316,6 +340,34 @@ struct SCPPrepare
     uint32 nH;                // h.n
 };
 ~~~~~
+
+The fields have the following meaning:
+
+* `quorumSetHash` - the SHA-256 hash of the sending node's
+  `SCPQuorumSet` structure.
+
+* `ballot` - the current ballot as described above.
+
+* `prepared` - the highest ballot `<n,x>` for which one of the
+  following two thresholds has been met:
+    * The sending node is part of a quorum in which each node included
+      `<n',x>` for `n' >= n` in one of the `ballot`, `prepared` or
+      `preparedPrime` fields of an `SCPPrepare` message.
+    * Every one of the sending node's quorum slices contains at least
+      one node that sent an `SCPPrepare` containing some `<n',x>` with
+      `n' >= n` in either the `prepared` or `preparedPrime` field.
+  If no such ballot exists, then `prepared` is `NULL`.
+
+* `preparedPrime` - the highest ballot `<n,x>` that satisfies the same
+  criteria as `prepared`, but has a different value `x` from that in
+  the `prepared` field.  `NULL` if no such ballot exists.
+
+* `nH` - the counter from the highest ballot `<n,x>` for which the
+  sender is in a quorum in which each member has sent an `SCPPrepare`
+  message with one of the following properties:
+    * The `prepared` field contains `<n',x>` where `n' >= n`, or
+    * The `preparedPrime` field contains `<n',x'>` where `n' >= n` and
+      `x'` can be any value.
 
 ## Confirm messages
 
@@ -330,6 +382,20 @@ struct SCPConfirm
 };
 ~~~~~
 
+This message conveys an implicit `SCPPrepare` message with the
+following fields:
+
+* `quorumSetHash` - same
+* `ballot` - `<infinity, x>` where `x` is the value in the
+  `SCPConfirm message's `ballot`.
+* `prepared` - same
+* `preparedPrime` - `NULL`
+* `nC` - same
+*  `nH` - `infinity`
+
+(Note that `infinity` here just represents 2^{32} -- an integer one
+greater than the largest representable value on the wire.)
+
 ## Externalize messages
 
 ~~~~~ {.xdr}
@@ -340,6 +406,17 @@ struct SCPExternalize
     Hash commitQuorumSetHash; // D used before EXTERNALIZE
 } externalize;
 ~~~~~
+
+An `SCPExternalize` message conveys two implicit `SCPConfirm`
+messages.  The first one has the following fields:
+
+* `ballot` - `<infinity,x>` where `x` is the value from the
+  `SCPExternalize` ballot.
+* `nPrepared` - `infinity`
+* `nCommit` -
+* `nH` -
+* `quorumSetHash` - 
+
 
 ## Message envelopes
 
