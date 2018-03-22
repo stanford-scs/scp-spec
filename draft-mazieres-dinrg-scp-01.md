@@ -118,7 +118,8 @@ messages.
 
 # The Model
 
-
+This section describes the configuration and input/output values of
+the consensus protocol.
 
 ## Configuration
 
@@ -174,7 +175,37 @@ on how many other nodes include that node in their quorum slices as
 well as how the current slot number perturbs a cryptographic hash of
 nodes' public keys.
 
+# Protocol
+
+The protocol consists of exchanging digitally-signed messages
+containing nodes' quorum slices.  The format of all messages is
+specified using XDR [@!RFC4506].  The messages convey votes on sets of
+conceptual statements using a technique called _federated voting_.  We
+next describe federated voting, then describe the protocol messages.
+
 ## Federated voting
+
+Federated voting allows nodes to agree on some statement `a`.  Not
+every attempt at federated voting may succeed; an attempt to vote on
+statement `a` may get stuck, with the result that the system may never
+come to agreement on whether to assume `a` or its opposite `!a` is
+true.  However, when federated agreement succeeds for statement `a`,
+two things are guaranteed:
+
+1. If 
+
+
+When multiple nodes send the same messages, two thresholds have
+significance throughout the protocol for each node `v`.
+
+* quorum threshold:  When `v` node is a member of a quorum in which
+  every member (including `v`) has issued some signed statement.
+
+* blocking threshold:  When every one of `v`'s quorum slices has a
+  member issuing some signed statement (which doesn't necessarily
+  include `v`).
+
+
 
 {#fig:voting}
                     "vote a OR accept A"        "accept a"
@@ -195,22 +226,6 @@ nodes' public keys.
            +---->|  voted !a |
                  +-----------+
 Figure: Federated voting process
-
-# Protocol
-
-The protocol consists of exchanging digitally-signed messages
-containing nodes' quorum slices.  When multiple nodes send the same
-messages, two thresholds have significance throughout the protocol for
-each node `v`.
-
-* quorum threshold:  When `v` node is a member of a quorum in which
-  every member (including `v`) has issued some signed statement.
-
-* blocking threshold:  When every one of `v`'s quorum slices has a
-  member issuing some signed statement (which doesn't necessarily
-  include `v`).
-
-Message formats are specified using XDR [@!RFC4506].
 
 ## Basic types
 
