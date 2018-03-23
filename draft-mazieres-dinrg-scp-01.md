@@ -109,8 +109,8 @@ would be unlikely to diverge.
 A more detailed abstract description of the SCP protocol and
 English-language proof of safety is available in [@?SCP].  In
 particular, that reference shows that a necessary property for safety,
-termed quorum intersection despite ill-behaved nodes, is sufficient to
-guarantee safety under SCP, making SCP optimally safe for any given
+termed _quorum intersection despite ill-behaved nodes_, is sufficient
+to guarantee safety under SCP, making SCP optimally safe for any given
 configuration.
 
 This document specifies the end-system logic and wire format of the
@@ -159,40 +159,56 @@ quorums to which they do not belong themselves.)
 ## Input and output
 
 The SCP protocol outputs a series of _values_ each associated with a
-consecutively numbered _slot_.  5 seconds after SCP outputs the value
-for one slot, nodes restart the protocol to select a value for the
-next slot.  Between slots, the pause is used to construct candidate
-values for the next slot, as well as to amortize the cost of consensus
-over an arbitrary-sized batch of operations.
+consecutively numbered _slot_.  The goal is for all non-faulty nodes
+to reach _agreement_ on the output value of each slot.  5 seconds
+after SCP outputs the value for one slot, nodes restart the protocol
+to select a value for the next slot.  The time elapsed between the
+completion of SCP on one slot and its initiation for the next slot is
+used to construct candidate values for the next slot, as well as to
+amortize the cost of consensus over an arbitrary-sized batch of
+operations.
 
 There must exist a combining function that reduces multiple candidate
 values into a single _composite_ value.  Should nodes nominate
 multiple values, they can deterministically converge on a single
-composite by applying the combining function.  Note that this does not
-mean that every node has a say in the composite value for every slot.
-Whether or not a node can in practice influence a given slot depends
-on how many other nodes include that node in their quorum slices as
-well as how the current slot number perturbs a cryptographic hash of
-nodes' public keys.
+composite value by applying the combining function.  For example, if
+values consist of sets of transactions, the combining function might
+take their union.  Or if values represent a timestamp and set of
+transactions, the combining function might pair the highest nominated
+timestamp with the transaction set that has the highest hash value.
+
+Note that not every node has a say in the composite value for every
+slot.  Whether or not a node can in practice influence a given slot
+depends on how many other nodes include that node in their quorum
+slices as well as how the current slot number and history perturb a
+cryptographic hash of nodes' public keys.
 
 # Protocol
 
 The protocol consists of exchanging digitally-signed messages
 containing nodes' quorum slices.  The format of all messages is
-specified using XDR [@!RFC4506].  The messages convey votes on sets of
-conceptual statements using a technique called _federated voting_.  We
-next describe federated voting, then describe the protocol messages.
+specified using XDR [@!RFC4506].  Messages compactly convey votes on
+sets of conceptual statements.  The core voting technique of voting
+with quorum slices is termed _federated voting_.  We next describe
+federated voting, then describe the protocol messages.
 
 ## Federated voting
 
-Federated voting allows nodes to agree on some statement `a`.  Not
-every attempt at federated voting may succeed; an attempt to vote on
-statement `a` may get stuck, with the result that the system may never
-come to agreement on whether to assume `a` or its opposite `!a` is
-true.  However, when federated agreement succeeds for statement `a`,
-two things are guaranteed:
+Federated voting allows each node to confirm some statement `a`.  Not
+every attempt at federated voting may succeed--an attempt to vote on
+statement `a` may get stuck, with the result that the system
+effectively never agrees on whether to assume `a`, its opposite `!a`,
+or neither.  However, when federated agreement succeeds for statement
+`a`, two things are guaranteed:
 
-1. If 
+1. In a configuration where any protocol can guarantee safety (i.e.,
+   quorum intersection holds despite ill-behaved nodes), no two
+   well-behaved nodes will confirm contradictory statements.
+
+1. If the conditions for #1 hold and the node confirming `a` is in
+   quorum consisting entirely of well-behaved nodes, then eventually
+   every member of such a quorum will confirm `a`.
+
 
 
 When multiple nodes send the same messages, two thresholds have
