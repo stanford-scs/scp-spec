@@ -1,0 +1,16 @@
+<reference anchor='FLP'>
+
+<front>
+<title>Impossibility of Distributed Consensus with One Faulty Process</title>
+<author initials='M.' surname='Fischer' fullname='Michael J. Fischer'>
+<organization /></author>
+<author initials='N.' surname='Lynch' fullname='Nancy A. Lynch'>
+<organization /></author>
+<author initials='M.' surname='Lynch' fullname='Michael S. Paterson'>
+<organization /></author>
+
+<date year='1985' />
+</front>
+
+  <seriesInfo name="Journal of the ACM" value="32(2):374-382" />
+</reference>
