@@ -67,7 +67,15 @@
 
 .# Abstract
 
-SCP is a protocol for Internet-level Byzantine agreement.
+SCP is an open Byzantine agreement protocol resistant to Sybil
+attacks.  It allows Internet infrastructure stakeholders to reach
+agreement on a series of values without unanimous agreement on what
+constitutes the set of important stakeholders.  A big differentiator
+from other Byzantine agreement protocols is that in SCP, nodes
+determine the composition of quorums in a decentralized way, by each
+selecting quorum slices they consider large or important enough to
+speak for the whole network.  A quorum must satisfy the quorum slices
+of each of its members.
 
 {mainmatter}
 
@@ -202,7 +210,7 @@ messages in the following subsection.
 Federated voting allows each node to confirm some statement `a`.  Not
 every attempt at federated voting may succeed--an attempt to vote on
 statement `a` may get stuck, with the result that nodes can confirm
-neither `a` nor its opposite `!a`.  However, when a node succeeds in
+neither `a` nor its negation `!a`.  However, when a node succeeds in
 confirming a statement `a`, federated voting guarantees two things:
 
 1. In a configuration and failure scenario in which it is possible for
@@ -221,14 +229,14 @@ that is compatible with the FLP impossibility result [@?FLP].
 
 As a node `v` collects federated voting messages for a given
 statement, two thresholds trigger state transitions in `v` depending
-on the message.  We define these points as follows:
+on the message.  We define these thresholds as follows:
 
 * _quorum threshold_:  When `v` receives a message from every member
-  of a quorum (including `v` itself)
+  of a quorum to which it belongs (including `v` itself)
 
 * _blocking threshold_:  When `v` receives the message from at least
-  one member of every one of its quorum slices (does not require `v`
-  itself to have issued the statement)
+  one member of every one of its quorum slices (which does not require
+  `v` itself to have issued the statement)
 
 Each node `v` can make two types of representation with respect to a
 statement `a` during federated voting:  _vote_ `a` and _accept_ `a`.
@@ -242,7 +250,7 @@ statement `a` during federated voting:  _vote_ `a` and _accept_ `a`.
   set of Byzantine failures to the point that no quorum containing `v`
   consists entirely of correct nodes.  (Nonetheless, accepting `a` is
   not sufficient to act on it, as doing so could violate agreement,
-  which is worse than merely getting stuck from a lack of correct
+  which is worse than merely getting stuck from a lack of any correct
   quorum.)
 
 (#fig:voting) illustrates the federated voting process.  A node `v`
@@ -252,11 +260,13 @@ node accepts `a`.  In fact, we relax this slightly and allow `v` to
 accept `a` if every member of a quorum has either voted for `a` or
 claimed to accept `a`, as some nodes may accept `a` without voting for
 it.  Indeed, a node that cannot vote for `a` because it has voted for
-the contradictory `!a` still accepts `a` when the statement "accept a"
+its negation `!a` still accepts `a` when the statement "accept a"
 reaches blocking threshold (meaning assertions about `!a` have no hope
 of reaching quorum threshold barring catastrophic Byzantine failure).
 Finally, if and when the statement "accept a" reaches quorum
 threshold, `v` has confirmed `a` and the federated vote has succeeded.
+In effect, the accept messages constitute a second vote on the fact
+that the vote messages succeeded.
 
 {#fig:voting}
                     "vote a OR accept A"        "accept a"
