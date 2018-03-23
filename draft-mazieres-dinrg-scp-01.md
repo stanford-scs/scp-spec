@@ -76,42 +76,42 @@ SCP is a protocol for Internet-level Byzantine agreement.
 Various aspects of Internet infrastructure depend on irreversible and
 transparent updates to data sets such as authenticated mappings
 [cite Li-Man-Watson draft].  Examples include public key certificates
-mapping names to public keys, transparency logs [@?RFC6962], and
-preload lists for HSTS [@?RFC6797] and HPKP [@?RFC7469].
+and revocations, transparency logs [@?RFC6962], and preload lists for
+HSTS [@?RFC6797] and HPKP [@?RFC7469].
 
 The Stellar Consensus Protocol (SCP) specified in this draft allows
 Internet infrastructure stakeholders to collaborate in applying
 irreversible transactions to public state.  SCP is an open Byzantine
 agreement protocol that resists Sybil attacks by allowing individual
 parties to specify minimum quorum memberships in terms of specific
-trusted peers.  Participants can choose combinations of peers on which
-to depend that they consider trustworthy in aggregate.  The protocol
-guarantees safety so long as these dependency sets transitively
-overlap and contain sufficiently many honest nodes correctly obeying
-the protocol.
+trusted peers.  Each participants chooses combinations of peers on
+which to depend such that these combinations can be trusted in
+aggregate.  The protocol guarantees safety so long as these dependency
+sets transitively overlap and contain sufficiently many honest nodes
+correctly obeying the protocol.
 
 Though bad configurations are theoretically possible, several
-analogies provide an intuition for why services can ensure transitive
-dependencies overlap in practice.  For example, given multiple
-entirely disjoint IP networks, people would form consensus on the fact
-that one containing <https://ietf.org/> and the world's top web sites
-is _the_ Internet.  Such a consensus can hold even without unanimous
-agreement on what constitute the world's top web sites.  Similarly, if
-network operators listed all the ASes from whom they would accept
-peering or transit (at the right price), the transitive closures of
-these sets would contain significant overlap, even without unanimous
-agreement on who constitutes a tier-1 ISP.  Finally, while different
-browsers and operating systems may have slightly different lists of
-valid certificate authorities, there is significant overlap in the
-sets, so that systems requiring hypothetical validation from "all" CAs
-would be unlikely to diverge.
+analogies provide an intuition for why transitive dependencies can be
+made overlap in practice.  For example, given multiple entirely
+disjoint Internet-protocol networks, people would have no trouble
+agreeing on the fact that network containing <https://ietf.org/> and
+the world's top web sites is _the_ Internet.  Such a consensus can
+hold even without unanimous agreement on what constitute the world's
+top web sites.  Similarly, if network operators listed all the ASes
+from whom they would accept peering or transit (at the right price),
+the transitive closures of these sets would contain significant
+overlap, even without unanimous agreement on the "tier-1 ISP"
+designation.  Finally, while different browsers and operating systems
+may have slightly different lists of valid certificate authorities,
+there is significant overlap in the sets, so that systems requiring
+hypothetical validation from "all CAs" would be unlikely to diverge.
 
-A more detailed abstract description of the SCP protocol and
-English-language proof of safety is available in [@?SCP].  In
-particular, that reference shows that a necessary property for safety,
-termed _quorum intersection despite ill-behaved nodes_, is sufficient
-to guarantee safety under SCP, making SCP optimally safe for any given
-configuration.
+A more detailed abstract description of SCP and its rationale,
+including an English-language proof of safety, is available in
+[@?SCP].  In particular, that reference shows that a necessary
+property for safety, termed _quorum intersection despite ill-behaved
+nodes_, is sufficient to guarantee safety under SCP, making SCP
+optimally safe against malicious nodes for any given configuration.
 
 This document specifies the end-system logic and wire format of the
 messages.
@@ -135,7 +135,7 @@ network.
 
 A _quorum_ is a non-empty set of nodes containing at least one quorum
 slice of each of its members.  For instance, suppose `v1` has the
-single quorum slice `{v1, v2, v3}`, and each of `v2`, `v3`, and `v4`
+single quorum slice `{v1, v2, v3}`, while each of `v2`, `v3`, and `v4`
 has the single quorum slice `{v2, v3, v4}`.  In this case, `{v2, v3,
 v4}` is a quorum, because it contains a slice for each member.  On the
 other hand `{v1, v2, v3}` is not a quorum, because it does not contain
@@ -147,8 +147,9 @@ care about quorums to which they belong themselves (and hence which
 contain at least one of their quorum slices).  Intuitively, this is
 what protects nodes from Sybil attacks.  In the example above, if `v3`
 deviates from the protocol, maliciously inventing 96 Sybils `v5, v6,
-..., v100`, the honest nodes quorums' will all still include one
-another.
+..., v100`, the honest nodes' quorums' will all still include one
+another, ensuring that `v1`, `v2`, and `v4` continue to agree on
+output values.
 
 Every message in the SCP protocol specifies the sender's quorum
 slices.  Hence, by collecting messages, a node dynamically learns what
@@ -163,65 +164,99 @@ consecutively numbered _slot_.  The goal is for all non-faulty nodes
 to reach _agreement_ on the output value of each slot.  5 seconds
 after SCP outputs the value for one slot, nodes restart the protocol
 to select a value for the next slot.  The time elapsed between the
-completion of SCP on one slot and its initiation for the next slot is
-used to construct candidate values for the next slot, as well as to
+completion of SCP on one slot and its initiation for the next is used
+to construct candidate values for the next slot, as well as to
 amortize the cost of consensus over an arbitrary-sized batch of
 operations.
 
-There must exist a combining function that reduces multiple candidate
-values into a single _composite_ value.  Should nodes nominate
-multiple values, they can deterministically converge on a single
-composite value by applying the combining function.  For example, if
-values consist of sets of transactions, the combining function might
-take their union.  Or if values represent a timestamp and set of
-transactions, the combining function might pair the highest nominated
-timestamp with the transaction set that has the highest hash value.
+From SCP's perspective, values are just opaque byte arrays whose
+interpretation is left to higher-level applications.  However, SCP
+requires a _combining function_ that reduces multiple candidate values
+into a single _composite_ value.  When nodes nominate multiple values
+for a slot, SCP nodes invoke this combining function to converge on a
+single composite value.  By way of example, in an application where
+values consist of sets of transactions, the combining function could
+take the union of transaction sets.  Alternatively, if values
+represent a timestamp and a set of transactions, the combining
+function might pair the highest nominated timestamp with the
+transaction set that has the highest hash value.
 
-Note that not every node has a say in the composite value for every
-slot.  Whether or not a node can in practice influence a given slot
-depends on how many other nodes include that node in their quorum
-slices as well as how the current slot number and history perturb a
-cryptographic hash of nodes' public keys.
+Not every node can influence the composite value for any given slot.
+Whether or not a node can affect a given slot depends on how many
+other nodes include that node in their quorum slices as well as how
+the current slot number and history perturb a cryptographic hash of
+nodes' public keys.
 
 # Protocol
 
 The protocol consists of exchanging digitally-signed messages
-containing nodes' quorum slices.  The format of all messages is
-specified using XDR [@!RFC4506].  Messages compactly convey votes on
-sets of conceptual statements.  The core voting technique of voting
-with quorum slices is termed _federated voting_.  We next describe
-federated voting, then describe the protocol messages.
+specifying nodes' quorum slices.  The format of all messages is
+specified using XDR [@!RFC4506].  In addition to quorum slices,
+messages compactly convey votes on sets of conceptual statements.  The
+core technique of voting with quorum slices is termed _federated
+voting_.  We next describe federated voting, then detail protocol
+messages in the following subsection.
 
 ## Federated voting
 
 Federated voting allows each node to confirm some statement `a`.  Not
 every attempt at federated voting may succeed--an attempt to vote on
-statement `a` may get stuck, with the result that the system
-effectively never agrees on whether to assume `a`, its opposite `!a`,
-or neither.  However, when federated agreement succeeds for statement
-`a`, two things are guaranteed:
+statement `a` may get stuck, with the result that nodes can confirm
+neither `a` nor its opposite `!a`.  However, when a node succeeds in
+confirming a statement `a`, federated voting guarantees two things:
 
-1. In a configuration where any protocol can guarantee safety (i.e.,
-   quorum intersection holds despite ill-behaved nodes), no two
-   well-behaved nodes will confirm contradictory statements.
+1. In a configuration and failure scenario in which it is possible for
+   any protocol to guarantee safety (i.e., quorum intersection holds
+   despite ill-behaved nodes), no two well-behaved nodes will confirm
+   contradictory statements.
 
-1. If the conditions for #1 hold and the node confirming `a` is in
-   quorum consisting entirely of well-behaved nodes, then eventually
-   every member of such a quorum will confirm `a`.
+2. If the condition for #1 holds and the node confirming `a` is a
+   member of one or more quorums consisting entirely of well-behaved
+   nodes, then eventually every member of every such a quorum will
+   confirm `a`.
 
+Intuitively, these conditions are key to ensuring agreement among
+nodes as well as a weak form of liveness (absence of stuck states)
+that is compatible with the FLP impossibility result [@?FLP].
 
+As a node `v` collects federated voting messages for a given
+statement, two thresholds trigger state transitions in `v` depending
+on the message.  We define these points as follows:
 
-When multiple nodes send the same messages, two thresholds have
-significance throughout the protocol for each node `v`.
+* _quorum threshold_:  When `v` receives a message from every member
+  of a quorum (including `v` itself)
 
-* quorum threshold:  When `v` node is a member of a quorum in which
-  every member (including `v`) has issued some signed statement.
+* _blocking threshold_:  When `v` receives the message from at least
+  one member of every one of its quorum slices (does not require `v`
+  itself to have issued the statement)
 
-* blocking threshold:  When every one of `v`'s quorum slices has a
-  member issuing some signed statement (which doesn't necessarily
-  include `v`).
+Each node `v` can make two types of representation with respect to a
+statement `a` during federated voting:  _vote_ `a` and _accept_ `a`.
 
+* _vote_ `a` states that `a` is a valid statement and constitutes a
+  promise by `v` not to vote for any contradictory message, such as
+  `!a`.
 
+* _accept_ `a` says that nodes may or may not come to agree on `a`,
+  but if they don't, then the system has experienced a catastrophic
+  set of Byzantine failures to the point that no quorum containing `v`
+  consists entirely of correct nodes.  (Nonetheless, accepting `a` is
+  not sufficient to act on it, as doing so could violate agreement,
+  which is worse than merely getting stuck from a lack of correct
+  quorum.)
+
+(#fig:voting) illustrates the federated voting process.  A node `v`
+votes for a valid statement `a` that doesn't contradict past votes `v`
+has issued.  When the vote statement reaches quorum threshold, the
+node accepts `a`.  In fact, we relax this slightly and allow `v` to
+accept `a` if every member of a quorum has either voted for `a` or
+claimed to accept `a`, as some nodes may accept `a` without voting for
+it.  Indeed, a node that cannot vote for `a` because it has voted for
+the contradictory `!a` still accepts `a` when the statement "accept a"
+reaches blocking threshold (meaning assertions about `!a` have no hope
+of reaching quorum threshold barring catastrophic Byzantine failure).
+Finally, if and when the statement "accept a" reaches quorum
+threshold, `v` has confirmed `a` and the federated vote has succeeded.
 
 {#fig:voting}
                     "vote a OR accept A"        "accept a"
@@ -609,6 +644,7 @@ Shore, and Jean-Luc Watson helped with the framing and motivation for
 this specification.
 
 {{reference.scp.xml}}
+{{reference.flp.xml}}
 
 {backmatter}
 
