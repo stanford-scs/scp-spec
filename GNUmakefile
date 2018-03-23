@@ -37,7 +37,7 @@ $(BINDIR)/xml2rfc:
 .gitignore: $(MAKEFILE_LIST)
 	rm -f $@~
 	set -f; for file in $(CLEANFILES); do \
-		echo "$$file" >> $@~; \
+		echo "$$file" | sed -e 's/-[0-9][0-9]\./-??./' >> $@~; \
 	done
 	echo 'mmark2rfc.html' >> $@~
 	mv -f $@~ $@
