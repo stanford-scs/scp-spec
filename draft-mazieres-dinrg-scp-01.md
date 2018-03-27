@@ -71,11 +71,11 @@ SCP is an open Byzantine agreement protocol resistant to Sybil
 attacks.  It allows Internet infrastructure stakeholders to reach
 agreement on a series of values without unanimous agreement on what
 constitutes the set of important stakeholders.  A big differentiator
-from other Byzantine agreement protocols is that in SCP, nodes
-determine the composition of quorums in a decentralized way, by each
-selecting quorum slices they consider large or important enough to
-speak for the whole network.  A quorum must satisfy the quorum slices
-of each of its members.
+from other Byzantine agreement protocols is that, in SCP, nodes
+determine the composition of quorums in a decentralized way:  each
+node selects quorum slices they consider large or important enough to
+speak for the whole network, and a quorum must satisfy the
+requirements of each of its members.
 
 {mainmatter}
 
@@ -99,20 +99,20 @@ sets transitively overlap and contain sufficiently many honest nodes
 correctly obeying the protocol.
 
 Though bad configurations are theoretically possible, several
-analogies provide an intuition for why transitive dependencies can be
-made overlap in practice.  For example, given multiple entirely
-disjoint Internet-protocol networks, people would have no trouble
-agreeing on the fact that network containing <https://ietf.org/> and
-the world's top web sites is _the_ Internet.  Such a consensus can
-hold even without unanimous agreement on what constitute the world's
-top web sites.  Similarly, if network operators listed all the ASes
-from whom they would accept peering or transit (at the right price),
-the transitive closures of these sets would contain significant
-overlap, even without unanimous agreement on the "tier-1 ISP"
-designation.  Finally, while different browsers and operating systems
-may have slightly different lists of valid certificate authorities,
-there is significant overlap in the sets, so that systems requiring
-hypothetical validation from "all CAs" would be unlikely to diverge.
+analogies provide an intuition for why transitive dependencies overlap
+in practice.  For example, given multiple entirely disjoint
+Internet-protocol networks, people would have no trouble agreeing on
+the fact that network containing the world's top web sites is _the_
+Internet.  Such a consensus can hold even without unanimous agreement
+on what constitute the world's top web sites.  Similarly, if network
+operators listed all the ASes from whom they would accept peering or
+transit (at the right price), the transitive closures of these sets
+would contain significant overlap, even without unanimous agreement on
+the "tier-1 ISP" designation.  Finally, while different browsers and
+operating systems have slightly different lists of valid certificate
+authorities, there is significant overlap in the sets, so that systems
+requiring hypothetical validation from "all CAs" would be unlikely to
+diverge.
 
 A more detailed abstract description of SCP and its rationale,
 including an English-language proof of safety, is available in
@@ -135,7 +135,7 @@ Each participant or _node_ in the SCP protocol has a digital signature
 key and is named by the corresponding public key, which we term a
 `NodeID`.
 
-Each node also selects one or more groups of nodes (each of which
+Each node also selects one or more sets of nodes (each of which
 includes itself) called _quorum slices_.  A quorum slice represents a
 large or important enough set of peers that the node selecting the
 quorum slice believes the slice collectively speaks for the whole
@@ -191,7 +191,7 @@ transaction set that has the highest hash value.
 
 Not every node can influence the composite value for any given slot.
 Whether or not a node can affect a given slot depends on how many
-other nodes include that node in their quorum slices as well as how
+other nodes include that node in their quorum slices, as well as how
 the current slot number and history perturb a cryptographic hash of
 nodes' public keys.
 
@@ -207,39 +207,41 @@ messages in the following subsection.
 
 ## Federated voting
 
-Federated voting allows each node to confirm some statement `a`.  Not
+Federated voting allows each node to confirm some statement.  Not
 every attempt at federated voting may succeed--an attempt to vote on
-statement `a` may get stuck, with the result that nodes can confirm
-neither `a` nor its negation `!a`.  However, when a node succeeds in
-confirming a statement `a`, federated voting guarantees two things:
+some statement `a` may get stuck, with the result that nodes can
+confirm neither `a` nor its negation `!a`.  However, when a node
+succeeds in confirming a statement `a`, federated voting guarantees
+two things:
 
-1. In a configuration and failure scenario in which it is possible for
-   any protocol to guarantee safety (i.e., quorum intersection holds
-   despite ill-behaved nodes), no two well-behaved nodes will confirm
-   contradictory statements.
+1. No two well-behaved nodes will confirm contradictory statements in
+   any configuration and failure scenario in which any protocol can
+   guarantee safety for the two nodes (i.e., quorum intersection for
+   the two nodes holds despite ill-behaved nodes).
 
-2. If the condition for #1 holds and the node confirming `a` is a
-   member of one or more quorums consisting entirely of well-behaved
-   nodes, then eventually every member of every such a quorum will
-   confirm `a`.
+2. If a node that is guaranteed safety by #1 confirms a statement `a`,
+   and that node is a member of one or more quorums consisting
+   entirely of well-behaved nodes, then eventually every member of
+   every such a quorum will also confirm `a`.
 
 Intuitively, these conditions are key to ensuring agreement among
 nodes as well as a weak form of liveness (absence of stuck states)
 that is compatible with the FLP impossibility result [@?FLP].
 
-As a node `v` collects federated voting messages for a given
-statement, two thresholds trigger state transitions in `v` depending
-on the message.  We define these thresholds as follows:
+As a node `v` collects federated voting messages for a given message
+`m`, two thresholds trigger state transitions in `v` depending on the
+message.  We define these thresholds as follows:
 
-* _quorum threshold_:  When `v` receives a message from every member
-  of a quorum to which it belongs (including `v` itself)
+* _quorum threshold_:  When every member of a quorum to which `v`
+  belongs (including `v` itself) has issued message `m`
 
-* _blocking threshold_:  When `v` receives the message from at least
-  one member of every one of its quorum slices (which does not require
-  `v` itself to have issued the statement)
+* _blocking threshold_:  When at least one member of each of `v`'s
+  quorum slices (a set that does not necessarily include `v` itself)
+  has issued message `m`
 
-Each node `v` can make two types of representation with respect to a
-statement `a` during federated voting:  _vote_ `a` and _accept_ `a`.
+Each node `v` can send three types of message with respect to a
+statement `a` during federated voting:  _vote_ `a`, _accept_ `a`, and
+_vote-or-accept_ `a`.
 
 * _vote_ `a` states that `a` is a valid statement and constitutes a
   promise by `v` not to vote for any contradictory message, such as
@@ -250,26 +252,32 @@ statement `a` during federated voting:  _vote_ `a` and _accept_ `a`.
   set of Byzantine failures to the point that no quorum containing `v`
   consists entirely of correct nodes.  (Nonetheless, accepting `a` is
   not sufficient to act on it, as doing so could violate agreement,
-  which is worse than merely getting stuck from a lack of any correct
+  which is worse than merely getting stuck from a lack of correct
   quorum.)
+
+* _vote-or-accept_ `a` is the disjunction of the above two messages.
+  A node implicitly sends such a message if it sends either _vote_ `a`
+  or _accept_ `a`.  Where it is inconvenient and unnecessary to
+  differentiate between the two cases, a node can explicitly send a
+  _vote-or-accept_ message.
 
 (#fig:voting) illustrates the federated voting process.  A node `v`
 votes for a valid statement `a` that doesn't contradict past votes `v`
-has issued.  When the vote statement reaches quorum threshold, the
-node accepts `a`.  In fact, we relax this slightly and allow `v` to
-accept `a` if every member of a quorum has either voted for `a` or
-claimed to accept `a`, as some nodes may accept `a` without voting for
-it.  Indeed, a node that cannot vote for `a` because it has voted for
-its negation `!a` still accepts `a` when the statement "accept a"
-reaches blocking threshold (meaning assertions about `!a` have no hope
-of reaching quorum threshold barring catastrophic Byzantine failure).
-Finally, if and when the statement "accept a" reaches quorum
-threshold, `v` has confirmed `a` and the federated vote has succeeded.
-In effect, the accept messages constitute a second vote on the fact
-that the vote messages succeeded.
+has cast or statements `v` has accepted.  When the _vote_ message
+reaches quorum threshold, the node accepts `a`.  In fact, `v` accepts
+`a` if the_vote-or-accept_ message has reaches quorum threshold, as
+some nodes may accept `a` without first voting for it.  Specifically,
+a node that cannot vote for `a` because it has voted for its negation
+`!a` still accepts `a` when the message _accept_ `a` reaches blocking
+threshold (meaning assertions about `!a` have no hope of reaching
+quorum threshold barring catastrophic Byzantine failure).  Finally, if
+and when the message _accept_ `a` reaches quorum threshold, `v` has
+confirmed `a` and the federated vote has succeeded.  In effect, the
+_accept_ messages constitute a second vote on the fact that the
+initial vote messages succeeded.
 
 {#fig:voting}
-                    "vote a OR accept A"        "accept a"
+                    "vote-or-accept a"          "accept a"
                          reaches                 reaches
                      quorum threshold        quorum threshold
                     +-----------------+     +-----------------+
@@ -280,7 +288,7 @@ that the vote messages succeeded.
      valid |     +-----------+     +-----------+     +-----------+
            |           |                 ^
     +-----------+      |                 | "accept a" reaches
-    |uncommitted|      +-----------------+ blocking threshold
+    |uncommitted|------+-----------------+ blocking threshold
     +-----------+      |
            |           |
            |     +-----------+
@@ -340,93 +348,118 @@ typedef opaque Value<>;
 ## Quorum slices
 
 Theoretically a quorum slice can be an arbitrary set of sets of nodes.
-However, it would not be possible to represent an arbitrary predicate
-on sets concisely.  Instead we specify quorum slices as any set of
-k-of-n members, where each of the n members can either be an
-individual node ID, or, recursively, another k-of-n predicate.
+However, arbitrary predicates on sets cannot be encoded concisely.
+Instead we specify quorum slices as any set of k-of-n members, where
+each of the n members can either be an individual node ID, or,
+recursively, another k-of-n set.
 
 ~~~~~ {.xdr}
 // supports things like: A,B,C,(D,E,F),(G,H,(I,J,K,L))
 // only allows 2 levels of nesting
 struct SCPQuorumSet
 {
-    uint32 threshold;            // the n in k-of-n
+    uint32 threshold;            // the k in k-of-n
     PublicKey validators<>;
-    SCPQuorumSet innerSets<>;
+    SCPQuorumSet1 innerSets<>;
+};
+struct SCPQuorumSet1
+{
+    uint32 threshold;            // the k in k-of-n
+    PublicKey validators<>;
+    SCPQuorumSet2 innerSets<>;
+};
+struct SCPQuorumSet2
+{
+    uint32 threshold;            // the k in k-of-n
+    PublicKey validators<>;
 };
 ~~~~~
 
+As described in (#message-envelopes), every protocol message is paired
+with a cryptographic hash of the sender's `SCPQuorumSet` and digitally
+signed.  Inner protocol messages described in the next few sections
+should be understood to be received in alongside such a quorum slice
+specification and digital signature.
+
 ## Nomination
 
-Nomination message are sent in the first phase of each slot in an
-attempt to select a value on which to try to agree.
+For each slot, the SCP protocol begins in a nomination phase whose
+goal is to devise one or more candidate output values for the
+consensus protocol.  Nodes send nomination messages contain a
+monotonically growing set of values in the following format:
 
 ~~~~~ {.xdr}
 struct SCPNomination
 {
-    Hash quorumSetHash; // D
     Value votes<>;      // X
     Value accepted<>;   // Y
 };
 ~~~~~
 
-As with all messages, the nomination protocol includes a SHA-256 hash
-of the sender's XDR-encoded SCPQuorumSet.  It also includes two
-monotonically-growing sets of values.
+The `votes` and `accepted` sets are disjoint; any value that is
+eligible for for both sets is placed only in the `accepted` set.
 
 `votes` consists of candidate values nominated by the sender.  Each
 node progresses through a series of nomination _rounds_ in which it
-potentially adds more and more values to `votes` by adding `votes` for
-valid values received from a growing set of peers to its own set of
-`votes`.  Each node computes the set of peers whose nomination `votes`
-it should echo based on its quorum slices as follows for round `n` of
-slot `i`:
+potentially grows the set of values in its own `votes` field by adding
+the contents of the `votes` and `accepted` fields of `SCPNomination`
+messages received from a growing set of peers.  In round `n` of slot
+`i`, each node determines the additional peers whose nominated values
+it should vote for as follows:
 
 * Let `Gi(m) = SHA-256(i || output[i-1] || m)`, where `output[i-1]` is
   the consensus output of slot i-1 or the zero-byte value for slot 0.
   (Recall values are encoded as an XDR opaque vector, with a 32-byte
-  length followed by bytes padded to a multiple of 4 bytes.)  Treat
-  the output of `Gi` as a 256-bit binary number in big-endian format.
+  length followed by bytes zero-padded to a multiple of 4 bytes.)
+  Treat the output of `Gi` as a 256-bit binary number in big-endian
+  format.
 
 * For each peer `v`, define `weight(v)` as the faction of quorum
   slices containing `v`.
 
 * Define the set of nodes `neighbors(n)` as the set of nodes v for
-  which `Gi("N" || n || v) < 2^{256}-1 * weight(v)`.
+  which `Gi("N" || n || v) < 2^{256} * weight(v)`.
 
 * Define `priority(n, v)` as `Gi("P" || n || v)`.
 
-For each round `n` until nomination starts, a node picks the available
-peer `v` with the highest value of priority in the given round from
-among the nodes in `neighbors(n)`, and adds any values in that node's
-`votes` set to its own `votes` set.  Round `n` lasts for `2+n`
-seconds, after which if nomination has not finished (see below), a
-node proceeds to round `n+1`.
+For each round `n` until nomination has finished, a node picks the
+available peer `v` with the highest value of `priority(n, v)` from
+among the nodes in `neighbors(n)`.  It then adds any values in `v`'s
+`votes` set to its own `votes` set.  If the node itself has the
+highest priority--meaning `v` is actually the node doing the
+nomination--then it adds to `votes` a candidate value supplied by the
+higher-level application of SCP.  Round `n` lasts for `2+n` seconds,
+after which, if nomination has not finished (see below), a node
+proceeds to round `n+1`.
 
 If a particular valid value `x` reaches quorum threshold in the
 messages sent by peers (meaning that every node in a quorum contains
-`x` either in the `votes` or the `accepted` field), then a node moves
-`x` from its `votes` field to its `accepted` field and broadcasts a
-new `SCPNomination` message.  Similarly, if `x` reaches blocking
-threshold in a node's peers' `accepted` field (meaning every one of a
-node's quorum slices contains at least one node with `x` in its
-`accepted` field), then the node adds `x` to its `accepted` field
-(removing it from `votes` if applicable).
+`x` either in the `votes` or the `accepted` field), then the node at
+which this happens moves `x` from its `votes` field to its `accepted`
+field and broadcasts a new `SCPNomination` message.  Similarly, if `x`
+reaches blocking threshold in a node's peers' `accepted` field
+(meaning every one of a node's quorum slices contains at least one
+node with `x` in its `accepted` field), then the node adds `x` to its
+`accepted` field (removing it from `votes` if applicable).  These two
+cases correspond to the two conditions for entering the `accepted`
+state in (#fig:voting).
 
-The nomination process terminates at a node when any value `x` reaches
-quorum threshold in the `accepted` fields, meaning every node in a
-quorum that includes the node has sent a signed `SCPNomination`
-message in which the `accepted` field contains `x`.  Once nomination
-terminates, nodes stop adding new values to their `votes` sets, but
-potentially continues adding new values to `accepted` as previously
-described.
+A node finishes the nomination phase whenever any value `x` reaches
+quorum threshold in the `accepted` fields.  Following the terminology
+of (#federated-voting), this condition corresponds to the node
+confirmed some value `x` as nominated.  A node that has finished the
+nomination phase stops adding new values to its `votes` set.  However,
+the node continues adding new values to `accepted` as appropriate.
+Doing so may lead to more values becoming confirmed nominated in the
+background.
 
 ## Prepare messages
 
-Once the nomination process is complete, meaning at least one
-`accepted` value has reached quorum threshold, a node moves on to the
-balloting phase of the protocol.  A ballot is a pair of a counter
-(`n`) and candidate value (`x`):
+Once the nomination process is complete at a node (meaning at least
+one candidate value is confirmed nominated), the node moves on to the
+prepare phase of the protocol, which uses federated voting to abort
+and commit ballots.  A ballot is a pair, consisting of a counter (`n`)
+and candidate value (`x`):
 
 ~~~~~ {.xdr}
 struct SCPBallot
@@ -436,30 +469,50 @@ struct SCPBallot
 };
 ~~~~~
 
-The counter beings at 1, and is incremented to higher numbers if
-ballot 1 fails to reach consensus on an output value.  The value `x`
-begins as the output of the deterministic combining function on all
-values that have achieved quorum threshold in the `accepted` fields of
-`SCPNomination` messages (meaning all values for which the local node
-is part of a quorum in which every node includes the value in the
-`accepted` field of an `SCPNomination` message).  Note, however, that
-`x` may change in subsequent ballots if more values reach this quorum
-threshold (since nomination keeps running in the background, even
-though a node does not add new values to its `votes` field in
-`SCPNomination`).  Moreover, as described below, `x` may change if a
-particular ballot makes it a certain way through the protocol before
-failing.
+`counter` beings at 1 for each slot, and is incremented to higher
+numbers if the first ballot fails to reach consensus on an output
+value.  `value` is initially chosen as the output of the deterministic
+combining function applied to all values that have been confirmed
+nominated for the slot.  Note, however, that this output may change in
+subsequent ballots if more values have been confirmed nominated in the
+background.  Moreover, as described below, the set of nominated values
+becomes irrelevant to as soon any ballot has made it beyond a certain
+point in the protocol before failing.
 
-Once they have selected `x` for a particular ballot, nodes attempt to
-`prepare` the ballot by sending the following message:
+Ballots are totally ordered with `n` more significant than `x`.
+Hence, we write `b1 < b2` to mean that either `b1.counter <
+b2.counter` or `b1.counter == b2.counter && b1.value < b2.value`.
+(Values are compared lexicographically, as a strings of octets.)
+
+For a given ballot `b`, nodes employ federated voting to chose between
+two contradictory outcomes:  _commit_ `b` and _abort_ `b`.  The
+protocol requires aborting large numbers of ballots
+simultaneously--specifically all ballots less than some target ballot
+that contain a different value than the target ballot.  We use a
+compact notation to encode such a set of _abort_ statements:
+
+* `prepare(b)` encodes an _abort_ statement for every ballot less than
+  `b` containing a different value from `b`.  Using set-builder
+  notation, `prepare(b) = { b1 | b1 < b AND b1.value != b.value }`.
+
+* _vote_ `prepare(b)` encodes a set of _vote_ messages for every
+  _abort_ statement in `prepare(b)`.
+
+* Similarly, _accept_ `prepare(b)` and _vote-or-accept_ `prepare(b)`
+  encode sets of _accept_ and _vote-or-accept_ messages for every
+  _abort_ statement in `prepare(b)`.
+
+An important invariant in the protocol is that a node must confirm
+`prepare(b)` before sending a _vote_ message for _commit_ `b`.
+
+Nodes send the following concrete message in the prepare phase:
 
 ~~~~~ {.xdr}
 struct SCPPrepare
 {
-    Hash quorumSetHash;       // D
     SCPBallot ballot;         // b
-    SCPBallot* prepared;      // p
-    SCPBallot* preparedPrime; // p'
+    SCPBallot *prepared;      // p
+    SCPBallot *preparedPrime; // p'
     uint32 nC;                // c.n
     uint32 nH;                // h.n
 };
@@ -467,24 +520,29 @@ struct SCPPrepare
 
 The fields have the following meaning:
 
-* `quorumSetHash` - the SHA-256 hash of the sending node's
-  `SCPQuorumSet` structure.
+* `ballot` - the current ballot, determined as discussed below.  This
+  field conveys the set of conceptual messages _vote-or-abort_
+  `prepare(ballot)`.
 
-* `ballot` - the current ballot (see below)
+* `prepared` - the highest ballot `b` for which the sender has
+  accepted `prepared(b)`.  More specifically, `prepared` contains the
+  highest `b` for which one of the following two conditions has been
+  met:
+    * The sending node is part of a quorum in which, for each node,
+      there is some ballot `b1` in the `ballot`, `prepared`, or
+      `preparedPrime` field of its latest `SCPPrepare` message such
+      that `b1.value == b.value && b1.counter >= b.counter`, or
+    * There is a set reaching blocking threshold at the sender such
+      that for each node in the set, there is some ballot `b1` in the
+      `prepared`, or `preparedPrime` field of its latest `SCPPrepare`
+      message such that `b1.value == b.value && b1.counter >=
+      b.counter`.
+  If no such ballot `b` exists, then `prepared` is `NULL`.
 
-* `prepared` - the highest ballot `<n,x>` for which one of the
-  following two thresholds has been met:
-    * The sending node is part of a quorum in which each node included
-      `<n',x>` for `n' >= n` in one of the `ballot`, `prepared` or
-      `preparedPrime` fields of an `SCPPrepare` message.
-    * Every one of the sending node's quorum slices contains at least
-      one node that sent an `SCPPrepare` containing some `<n',x>` with
-      `n' >= n` in either the `prepared` or `preparedPrime` field.
-  If no such ballot exists, then `prepared` is `NULL`.
-
-* `preparedPrime` - the highest ballot `<n,x>` that satisfies the same
-  criteria as `prepared`, but has a different value `x` from that in
-  the `prepared` field.  `NULL` if no such ballot exists.
+* `preparedPrime` - the highest ballot `b` satisfying the same
+  criteria as `prepared` with the additional constraint that
+  `preparedPrime.value != prepared.value`.  `preparedPrime` is `NULL`
+  if no such ballot exists.
 
 * `nH` - the counter from the highest ballot `<n,x>` for which the
   sender is in a quorum in which each member has sent an `SCPPrepare`
