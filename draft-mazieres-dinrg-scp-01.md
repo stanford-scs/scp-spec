@@ -476,13 +476,12 @@ the node continues adding new values to `accepted` as appropriate.
 Doing so may lead to more values becoming confirmed nominated in the
 background.
 
-## Prepare messages
+## Ballots
 
 Once the nomination process is complete at a node (meaning at least
-one candidate value is confirmed nominated), the node moves on to the
-prepare phase of the protocol, which uses federated voting to abort
-and commit ballots.  A ballot is a pair, consisting of a counter (`n`)
-and candidate value (`x`):
+one candidate value is confirmed nominated), the node engages in
+federated voting on messages to _commit_ and _abort_ ballots.  A
+ballot is a pair, consisting of a counter and candidate value:
 
 ~~~~~ {.xdr}
 struct SCPBallot
@@ -492,20 +491,21 @@ struct SCPBallot
 };
 ~~~~~
 
-`counter` beings at 1 for each slot, and is incremented to higher
-numbers if the first ballot fails to reach consensus on an output
-value.  `value` is initially chosen as the output of the deterministic
-combining function applied to all values that have been confirmed
-nominated for the slot.  Note, however, that this output may change in
-subsequent ballots if more values have been confirmed nominated in the
-background.  Moreover, as described below, the set of nominated values
-becomes irrelevant to as soon any ballot has made it beyond a certain
-point in the protocol before failing.
-
-Ballots are totally ordered with `n` more significant than `x`.
-Hence, we write `b1 < b2` to mean that either `b1.counter <
+Ballots are totally ordered with `counter` more significant than
+`value`.  Hence, we write `b1 < b2` to mean that either `b1.counter <
 b2.counter` or `b1.counter == b2.counter && b1.value < b2.value`.
-(Values are compared lexicographically, as a strings of octets.)
+(Values are compared lexicographically, as a strings of unsigned
+octets.)  The protocol moves through successively higher ballots until
+it reaches consensus on a slot:  `counter` starts at 1 and is
+incremented under various conditions that indicate nodes may be unable
+confirm _commit_ for the current ballot.
+
+A node may not vote for both `commit b` and `abort b` on the same
+ballot `b`.  Hence, federated voting can confirm at most one outcome
+for `b`.  
+
+          As an additional restriction, a node may not vote `commit b`
+
 
 For a given ballot `b`, nodes employ federated voting to chose between
 two contradictory outcomes:  _commit_ `b` and _abort_ `b`.  The
@@ -527,6 +527,21 @@ compact notation to encode such a set of _abort_ statements:
 
 An important invariant in the protocol is that a node must confirm
 `prepare(b)` before sending a _vote_ message for _commit_ `b`.
+
+
+## Prepare messages
+
+`counter` beings at 1 for each slot, and is incremented to higher
+numbers if the first ballot fails to reach consensus on an output
+value.  `value` is initially chosen as the output of the deterministic
+combining function applied to all values that have been confirmed
+nominated for the slot.  Note, however, that this output may change in
+subsequent ballots if more values have been confirmed nominated in the
+background.  Moreover, as described below, the set of nominated values
+becomes irrelevant to as soon any ballot has made it beyond a certain
+point in the protocol before failing.
+
+
 
 Nodes send the following concrete message in the prepare phase:
 
