@@ -480,8 +480,9 @@ background.
 
 Once the nomination process is complete at a node (meaning at least
 one candidate value is confirmed nominated), the node engages in
-federated voting on messages to _commit_ and _abort_ ballots.  A
-ballot is a pair, consisting of a counter and candidate value:
+federated voting to chose between _commit_ and _abort_ outcomes for
+ballots.  A ballot is a pair, consisting of a counter and candidate
+value:
 
 ~~~~~ {.xdr}
 struct SCPBallot
@@ -495,38 +496,37 @@ Ballots are totally ordered with `counter` more significant than
 `value`.  Hence, we write `b1 < b2` to mean that either `b1.counter <
 b2.counter` or `b1.counter == b2.counter && b1.value < b2.value`.
 (Values are compared lexicographically, as a strings of unsigned
-octets.)  The protocol moves through successively higher ballots until
-it reaches consensus on a slot:  `counter` starts at 1 and is
-incremented under various conditions that indicate nodes may be unable
-confirm _commit_ for the current ballot.
+octets.)
 
-A node may not vote for both `commit b` and `abort b` on the same
-ballot `b`.  Hence, federated voting can confirm at most one outcome
-for `b`.  
+The protocol moves through federated voting on successively higher
+ballots until nodes confirm `commit b` for some ballot `b`, at which
+point consensus terminates and outputs `b.value` for the slot.  To
+ensure that only one value can be chosen for a slot and that the
+protocol cannot get stuck if individual ballots get stuck, there are
+two restrictions on voting:
 
-          As an additional restriction, a node may not vote `commit b`
+1. A node cannot vote for both `commit b` and `abort b` on the same
+   ballot (the two outcomes are contradictory), and
 
+2. A node may not vote for `commit b` for any ballot `b` unless it has
+   aborted every lesser ballot with a different value.
 
-For a given ballot `b`, nodes employ federated voting to chose between
-two contradictory outcomes:  _commit_ `b` and _abort_ `b`.  The
-protocol requires aborting large numbers of ballots
-simultaneously--specifically all ballots less than some target ballot
-that contain a different value than the target ballot.  We use a
-compact notation to encode such a set of _abort_ statements:
+The second condition requires voting to abort large numbers of
+ballots, for which we introduce the following notation:
 
-* `prepare(b)` encodes an _abort_ statement for every ballot less than
-  `b` containing a different value from `b`.  Using set-builder
-  notation, `prepare(b) = { b1 | b1 < b AND b1.value != b.value }`.
+* `prepare(b)` encodes an `abort` statement for every ballot less than
+  `b` containing a value other than `b.value`, i.e.,
+  `prepare(b) = { abort b1 | b1 < b AND b1.value != b.value }`.
 
-* _vote_ `prepare(b)` encodes a set of _vote_ messages for every
-  _abort_ statement in `prepare(b)`.
+* `vote prepare(b)` stands for a set of _vote_ messages for every
+  `abort` statement in `prepare(b)`.
 
-* Similarly, _accept_ `prepare(b)` and _vote-or-accept_ `prepare(b)`
+* Similarly, `accept prepare(b)` and `vote-or-accept prepare(b)`
   encode sets of _accept_ and _vote-or-accept_ messages for every
-  _abort_ statement in `prepare(b)`.
+  `abort` statement in `prepare(b)`.
 
-An important invariant in the protocol is that a node must confirm
-`prepare(b)` before sending a _vote_ message for _commit_ `b`.
+Using this terminology, a node must confirm `prepare(b)` before
+issuing a _vote_ message for the statement `commit b`.
 
 
 ## Prepare messages
