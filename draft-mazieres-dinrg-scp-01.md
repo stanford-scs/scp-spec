@@ -73,9 +73,9 @@ agreement on a series of values without unanimous agreement on what
 constitutes the set of important stakeholders.  A big differentiator
 from other Byzantine agreement protocols is that, in SCP, nodes
 determine the composition of quorums in a decentralized way:  each
-node selects quorum slices they consider large or important enough to
-speak for the whole network, and a quorum must satisfy the
-requirements of each of its members.
+node selects sets of nodes it considers large or important enough to
+speak for the whole network, and a quorum must contain such set for
+each of its members.
 
 {mainmatter}
 
@@ -84,8 +84,9 @@ requirements of each of its members.
 Various aspects of Internet infrastructure depend on irreversible and
 transparent updates to data sets such as authenticated mappings
 [cite Li-Man-Watson draft].  Examples include public key certificates
-and revocations, transparency logs [@?RFC6962], and preload lists for
-HSTS [@?RFC6797] and HPKP [@?RFC7469].
+and revocations, transparency logs [@?RFC6962], preload lists for HSTS
+[@?RFC6797] and HPKP [@?RFC7469], and IP address delegation
+[@?I-D.paillisse-sidrops-blockchain].
 
 The Stellar Consensus Protocol (SCP) specified in this draft allows
 Internet infrastructure stakeholders to collaborate in applying
@@ -105,21 +106,22 @@ Internet-protocol networks, people would have no trouble agreeing on
 the fact that network containing the world's top web sites is _the_
 Internet.  Such a consensus can hold even without unanimous agreement
 on what constitute the world's top web sites.  Similarly, if network
-operators listed all the ASes from whom they would accept peering or
-transit (at the right price), the transitive closures of these sets
-would contain significant overlap, even without unanimous agreement on
-the "tier-1 ISP" designation.  Finally, while different browsers and
+operators listed all the ASes from whom they would consider peering or
+transit worthwhile, the transitive closures of these sets would
+contain significant overlap, even without unanimous agreement on the
+"tier-1 ISP" designation.  Finally, while different browsers and
 operating systems have slightly different lists of valid certificate
-authorities, there is significant overlap in the sets, so that systems
-requiring hypothetical validation from "all CAs" would be unlikely to
-diverge.
+authorities, there is significant overlap in the sets, so that a
+hypothetical system requiring validation from "all CAs" would be
+unlikely to diverge.
 
 A more detailed abstract description of SCP and its rationale,
 including an English-language proof of safety, is available in
 [@?SCP].  In particular, that reference shows that a necessary
 property for safety, termed _quorum intersection despite ill-behaved
 nodes_, is sufficient to guarantee safety under SCP, making SCP
-optimally safe against malicious nodes for any given configuration.
+optimally safe against Byzantine node failure for any given
+configuration.
 
 This document specifies the end-system logic and wire format of the
 messages.
@@ -155,7 +157,7 @@ care about quorums to which they belong themselves (and hence which
 contain at least one of their quorum slices).  Intuitively, this is
 what protects nodes from Sybil attacks.  In the example above, if `v3`
 deviates from the protocol, maliciously inventing 96 Sybils `v5, v6,
-..., v100`, the honest nodes' quorums' will all still include one
+..., v100`, the honest nodes' quorums will all still include one
 another, ensuring that `v1`, `v2`, and `v4` continue to agree on
 output values.
 
@@ -169,13 +171,16 @@ quorums to which they do not belong themselves.)
 
 The SCP protocol outputs a series of _values_ each associated with a
 consecutively numbered _slot_.  The goal is for all non-faulty nodes
-to reach _agreement_ on the output value of each slot.  5 seconds
-after SCP outputs the value for one slot, nodes restart the protocol
-to select a value for the next slot.  The time elapsed between the
-completion of SCP on one slot and its initiation for the next is used
-to construct candidate values for the next slot, as well as to
-amortize the cost of consensus over an arbitrary-sized batch of
-operations.
+to reach _agreement_ on the output value of each slot, after which the
+effects of the value--generally a batch of transactions to be applied
+to a replicated state machine--cannot be reversed.
+
+SCP pauses 5 seconds between slots.  This pause allows the cost of
+consensus to be amortized over an arbitrary-sized batch of operations.
+During the pause, nodes collect transactions and other inputs so as to
+devise candidate values for the next slot.  Any node may be called
+upon to propose a candidate value, although in practice only one or a
+small number of nodes actually propose values for any given slot.
 
 From SCP's perspective, values are just opaque byte arrays whose
 interpretation is left to higher-level applications.  However, SCP
@@ -197,19 +202,19 @@ nodes' public keys.
 
 # Protocol
 
-The protocol consists of exchanging digitally-signed messages
-specifying nodes' quorum slices.  The format of all messages is
-specified using XDR [@!RFC4506].  In addition to quorum slices,
-messages compactly convey votes on sets of conceptual statements.  The
-core technique of voting with quorum slices is termed _federated
-voting_.  We next describe federated voting, then detail protocol
-messages in the following subsection.
+The protocol consists of exchanging digitally-signed messages bound to
+nodes' quorum slices.  The format of all messages is specified using
+XDR [@!RFC4506].  In addition to quorum slices, messages compactly
+convey votes on sets of conceptual statements.  The core technique of
+voting with quorum slices is termed _federated voting_.  We next
+describe federated voting, then detail protocol messages in the
+following subsection.
 
 ## Federated voting
 
-Federated voting allows each node to confirm some statement.  Not
-every attempt at federated voting may succeed--an attempt to vote on
-some statement `a` may get stuck, with the result that nodes can
+Federated voting is a process through which nodes confirm statements.
+Not every attempt at federated voting may succeed--an attempt to vote
+on some statement `a` may get stuck, with the result that nodes can
 confirm neither `a` nor its negation `!a`.  However, when a node
 succeeds in confirming a statement `a`, federated voting guarantees
 two things:
@@ -265,7 +270,7 @@ _vote-or-accept_ `a`.
 votes for a valid statement `a` that doesn't contradict past votes `v`
 has cast or statements `v` has accepted.  When the _vote_ message
 reaches quorum threshold, the node accepts `a`.  In fact, `v` accepts
-`a` if the_vote-or-accept_ message has reaches quorum threshold, as
+`a` if the _vote-or-accept_ message has reaches quorum threshold, as
 some nodes may accept `a` without first voting for it.  Specifically,
 a node that cannot vote for `a` because it has voted for its negation
 `!a` still accepts `a` when the message _accept_ `a` reaches blocking
@@ -375,6 +380,24 @@ struct SCPQuorumSet2
 };
 ~~~~~
 
+Let `k` be the value of `threshold` and `n` the sum of the sizes of
+the `validators` and `innerSets` vectors in a message send by some
+node `v`.  A message `m` sent by `v` reaches quorum threshold at `v`
+when three things hold:
+
+1. `v` itself has issued (digitally signed) the message,
+2. The number of nodes in `validators` who have signed `m` plus the
+   number `innerSets` that (recursively) meet this condition is at
+   least `k`, and
+3. These three conditions apply (recursively) at some combination of
+   nodes sufficient for condition #2.
+
+A message reaches blocking threshold at `v` when the number of
+`validators` making the statement plus (recursively) the number
+`innerSets` reaching blocking threshold exceeds `n-k`.  (Blocking
+threshold is a local property that does not require a recursive check
+like step #3 above.)
+
 As described in (#message-envelopes), every protocol message is paired
 with a cryptographic hash of the sender's `SCPQuorumSet` and digitally
 signed.  Inner protocol messages described in the next few sections
@@ -385,7 +408,7 @@ specification and digital signature.
 
 For each slot, the SCP protocol begins in a nomination phase whose
 goal is to devise one or more candidate output values for the
-consensus protocol.  Nodes send nomination messages contain a
+consensus protocol.  Nodes send nomination messages that contain a
 monotonically growing set of values in the following format:
 
 ~~~~~ {.xdr}
@@ -446,8 +469,8 @@ state in (#fig:voting).
 
 A node finishes the nomination phase whenever any value `x` reaches
 quorum threshold in the `accepted` fields.  Following the terminology
-of (#federated-voting), this condition corresponds to the node
-confirmed some value `x` as nominated.  A node that has finished the
+of (#federated-voting), this condition corresponds to when the node
+confirms some value `x` as nominated.  A node that has finished the
 nomination phase stops adding new values to its `votes` set.  However,
 the node continues adding new values to `accepted` as appropriate.
 Doing so may lead to more values becoming confirmed nominated in the
@@ -513,8 +536,8 @@ struct SCPPrepare
     SCPBallot ballot;         // b
     SCPBallot *prepared;      // p
     SCPBallot *preparedPrime; // p'
-    uint32 nC;                // c.n
     uint32 nH;                // h.n
+    uint32 nC;                // c.n
 };
 ~~~~~
 
