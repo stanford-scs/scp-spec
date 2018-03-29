@@ -244,9 +244,8 @@ message.  We define these thresholds as follows:
   quorum slices (a set that does not necessarily include `v` itself)
   has issued message `m`
 
-Each node `v` can send three types of message with respect to a
-statement `a` during federated voting:  _vote_ `a`, _accept_ `a`, and
-_vote-or-accept_ `a`.
+Each node `v` can send several types of message with respect to a
+statement `a` during federated voting:
 
 * _vote_ `a` states that `a` is a valid statement and constitutes a
   promise by `v` not to vote for any contradictory message, such as
@@ -266,6 +265,13 @@ _vote-or-accept_ `a`.
   differentiate between the two cases, a node can explicitly send a
   _vote-or-accept_ message.
 
+* _confirm_ `a` indicates that _accept_ `a` has reached quorum
+  threshold at the sender.  This message is not strictly necessary,
+  and is interpreted the same as _accept_ `a` except that it allows an
+  optimization in which recipients can ignore the contents of the
+  sender's quorum slices because the sender claims already to have
+  been satisfied.
+
 (#fig:voting) illustrates the federated voting process.  A node `v`
 votes for a valid statement `a` that doesn't contradict past votes `v`
 has cast or statements `v` has accepted.  When the _vote_ message
@@ -275,11 +281,14 @@ some nodes may accept `a` without first voting for it.  Specifically,
 a node that cannot vote for `a` because it has voted for its negation
 `!a` still accepts `a` when the message _accept_ `a` reaches blocking
 threshold (meaning assertions about `!a` have no hope of reaching
-quorum threshold barring catastrophic Byzantine failure).  Finally, if
-and when the message _accept_ `a` reaches quorum threshold, `v` has
+quorum threshold barring catastrophic Byzantine failure).
+
+If and when the message _accept_ `a` reaches quorum threshold, `v` has
 confirmed `a` and the federated vote has succeeded.  In effect, the
 _accept_ messages constitute a second vote on the fact that the
-initial vote messages succeeded.
+initial vote messages succeeded.  Once `v` enters the confirmed state,
+it may issue a _confirm_ `a` message to help other nodes confirm `a`
+more efficiently (by pruning their quorum search).
 
 {#fig:voting}
                     "vote-or-accept a"          "accept a"
@@ -406,7 +415,7 @@ specification and digital signature.
 
 ## Nomination
 
-For each slot, the SCP protocol begins in a nomination phase whose
+For each slot, the SCP protocol begins in a NOMINATION phase whose
 goal is to devise one or more candidate output values for the
 consensus protocol.  Nodes send nomination messages that contain a
 monotonically growing set of values in the following format:
@@ -467,22 +476,23 @@ node with `x` in its `accepted` field), then the node adds `x` to its
 cases correspond to the two conditions for entering the `accepted`
 state in (#fig:voting).
 
-A node finishes the nomination phase whenever any value `x` reaches
+A node finishes the NOMINATION phase whenever any value `x` reaches
 quorum threshold in the `accepted` fields.  Following the terminology
 of (#federated-voting), this condition corresponds to when the node
 confirms some value `x` as nominated.  A node that has finished the
-nomination phase stops adding new values to its `votes` set.  However,
+NOMINATION phase stops adding new values to its `votes` set.  However,
 the node continues adding new values to `accepted` as appropriate.
 Doing so may lead to more values becoming confirmed nominated in the
 background.
 
 ## Ballots
 
-Once the nomination process is complete at a node (meaning at least
-one candidate value is confirmed nominated), the node engages in
-federated voting to chose between _commit_ and _abort_ outcomes for
-ballots.  A ballot is a pair, consisting of a counter and candidate
-value:
+After completing the NOMINATION phase (meaning after at least one
+candidate value is confirmed nominated), a node moves through three
+phases of balloting: the PREPARE, CONFIRM, and EXTERNALIZE phases.
+Balloting employs federated voting to chose between _commit_ and
+_abort_ statements for ballots.  A ballot is a pair, consisting of a
+counter and candidate value:
 
 ~~~~~ {.xdr}
 struct SCPBallot
@@ -521,15 +531,67 @@ ballots, for which we introduce the following notation:
 * `vote prepare(b)` stands for a set of _vote_ messages for every
   `abort` statement in `prepare(b)`.
 
-* Similarly, `accept prepare(b)` and `vote-or-accept prepare(b)`
-  encode sets of _accept_ and _vote-or-accept_ messages for every
-  `abort` statement in `prepare(b)`.
+* Similarly, `accept prepare(b)`, `vote-or-accept prepare(b)`, and
+  `confirm prepare(b)` encode sets of _accept_, _vote-or-accept_, and
+  _confirm_ messages for every `abort` statement in `prepare(b)`.
 
 Using this terminology, a node must confirm `prepare(b)` before
 issuing a _vote_ message for the statement `commit b`.
 
-
 ## Prepare messages
+
+The first balloting phase is the PREPARE phase.  During this phase,
+nodes send the following message:
+
+~~~~~ {.xdr}
+struct SCPPrepare
+{
+    SCPBallot ballot;         // b
+    SCPBallot *prepared;      // p
+    SCPBallot *preparedPrime; // pPrime
+    uint32 hcounter;          // h.counter or 0 if h == NULL
+    uint32 ccounter;          // c.counter or 0 if c == NULL
+};
+~~~~~
+
+This message conveys the following (conceptual) federated voting
+messages:
+
+* `vote-or-accept prepare(ballot)`
+* If `prepared != NULL`: `accept prepare(*prepared)`
+* If `preparedPrime != NULL`: `accept prepare(*preparedPrime)`
+* If `hcounter != 0`: `confirm prepare(b)`, where `b.counter ==
+  hcounter` and `b.value == ballot.counter`
+* If `ccounter != 0`: _vote_ `commit b` for every ballot `b` with
+  `ccounter <= b.counter <= hcounter` and `b.value == ballot.value`.
+
+
+blah
+
+
+* `ballot` - The current ballot that a node is attempting to prepare
+  and commit.  `ballot.counter` is initialized to 1 and increased
+  under the following circumstances:
+    * Whenever a node discovers that a particular 
+
+
+* `prepared` - The highest ballot such that federated voting has
+  reached the accepted state for every statement in
+  `prepare(prepared)`, or NULL if no ballot has been accepted prepared
+
+* `preparedPrime` - The highest ballot accepted prepared but for which
+  `preparedPrime.value != prepared.value`, or NULL if there is no such
+  ballot
+
+* `h` - The highest ballot such that federated voting has reached the
+  confirmed state for every statement in `prepare(h)`, or NULL if
+  no ballot has been accepted prepared
+
+* `c` - The lowest ballot that the node is currently voting `confirm
+  c`, or NULL if the node is not voting to confirm any ballot
+
+
+
 
 `counter` beings at 1 for each slot, and is incremented to higher
 numbers if the first ballot fails to reach consensus on an output
@@ -544,17 +606,6 @@ point in the protocol before failing.
 
 
 Nodes send the following concrete message in the prepare phase:
-
-~~~~~ {.xdr}
-struct SCPPrepare
-{
-    SCPBallot ballot;         // b
-    SCPBallot *prepared;      // p
-    SCPBallot *preparedPrime; // p'
-    uint32 nH;                // h.n
-    uint32 nC;                // c.n
-};
-~~~~~
 
 The fields have the following meaning:
 
