@@ -554,7 +554,7 @@ issuing a _vote_ message for the statement `commit b`.
 
 ## Prepare messages
 
-The first balloting phase is the PREPARE phase.  During this phase,
+The first phase of balloting is the PREPARE phase.  During this phase,
 nodes send the following message:
 
 ~~~~~ {.xdr}
@@ -562,142 +562,101 @@ struct SCPPrepare
 {
     SCPBallot ballot;         // b
     SCPBallot *prepared;      // p
-    SCPBallot *preparedPrime; // pPrime
+    SCPBallot *preparedPrime; // p'
     uint32 hcounter;          // h.counter or 0 if h == NULL
     uint32 ccounter;          // c.counter or 0 if c == NULL
 };
 ~~~~~
 
-This message conveys the following (conceptual) federated voting
-messages:
+This message compactly conveys the following (conceptual) federated
+voting messages:
 
 * `vote-or-accept prepare(ballot)`
 * If `prepared != NULL`: `accept prepare(*prepared)`
 * If `preparedPrime != NULL`: `accept prepare(*preparedPrime)`
-* If `hcounter != 0`: `confirm prepare(b)`, where `b.counter ==
-  hcounter` and `b.value == ballot.counter`
-* If `ccounter != 0`: _vote_ `commit b` for every ballot `b` with
-  `ccounter <= b.counter <= hcounter` and `b.value == ballot.value`.
+* If `hcounter != 0`: `confirm prepare(bp)`, where `bp.counter ==
+  hcounter` and `bp.value == ballot.counter`
+* If `ccounter != 0`: _vote_ `commit bc` for every ballot `bc` with
+  `ccounter <= bc.counter <= hcounter` and `bc.value == ballot.value`.
+
+Note that to be valid, an `SCPPrepare` message must satisfy
+`preparedPrime < prepared <= ballot` (unless `prepared ==
+preparedPrime == NULL`), and `ccounter <= hcounter <= ballot.counter`.
+
+Based on the federated vote messages received, each node keeps track
+of what ballots have been accepted and confirmed prepared.  It uses
+these ballots to set the following fields of its own `SCPPrepare`
+messages as follows.
+
+`prepared`
+: The highest accepted prepared ballot or or NULL if no ballot has
+  been accepted prepared
+
+`preparedPrime`
+: The highest accepted prepared ballot such that `preparedPrime.value
+  != prepared.value`, or NULL if there is no such ballot
+
+`hcounter`
+: The `counter` field of the highest confirmed prepared ballot, or 0
+  if no ballot has been confirmed prepared (Only the counter is
+  included because the `value` of the highest confirmed prepared
+  ballot is always the same as `ballot.value`.)
 
 
-blah
+`ballot`
+: The current ballot that a node is attempting to prepare and commit.
+  The rules for setting each field are detailed below.
 
+`ballot.counter`
+:  The counter is set according to the following rules:
 
-* `ballot` - The current ballot that a node is attempting to prepare
-  and commit.  `ballot.counter` is initialized to 1 and increased
-  under the following circumstances:
-    * Whenever a node discovers that a particular 
+    * Upon entering the PREPARE phase, the `counter` field is
+      initialized to 1.
 
+    * When a node sees sees `SCPPrepare` messages from a quorum to
+      which it belongs such that each message's `ballot.counter` is
+      greater than or equal to the local `ballot.counter`, the node
+      arms a timer for its local `ballot.counter + 1` seconds.
 
-* `prepared` - The highest ballot such that federated voting has
-  reached the accepted state for every statement in
-  `prepare(prepared)`, or NULL if no ballot has been accepted prepared
+    * If the timer fires, a node increments the ballot counter and
+      determines a new `value` according to the rules for the
+      `ballot.value` field.
 
-* `preparedPrime` - The highest ballot accepted prepared but for which
-  `preparedPrime.value != prepared.value`, or NULL if there is no such
-  ballot
+    * If nodes forming a blocking threshold all have `ballot.counter`
+      values greater than the local `ballot.counter`, then the local
+      node immediately increases `ballot.counter` to the lowest value
+      such that this is no longer the case.  (When doing so, it also
+      disables any timers pending timers associated with the old timer
+      value.)
 
-* `h` - The highest ballot such that federated voting has reached the
-  confirmed state for every statement in `prepare(h)`, or NULL if
-  no ballot has been accepted prepared
+    * If a new ballot `h` is confirmed such that `ballot < h`, then
+      immediately set `ballot` to `h`.   XXX - When would this happen?
 
-* `c` - The lowest ballot that the node is currently voting `confirm
-  c`, or NULL if the node is not voting to confirm any ballot
+`ballot.value`
+: Each time the ballot counter is changed, the value is recomputed as
+  follows.  If any ballot has been confirmed prepared, then the value
+  is taken to `h.value` for the highest confirmed prepared ballot `h`.
+  Otherwise (if `hcounter = 0`), the value is taken as the output of
+  the deterministic combining function applied to all confirmed
+  nominated values (as set that may continue to grow even during the
+  balloting phase).
 
+`ccounter`
+: The value `ccounter` is maintained based on an internally-maintained
+  "commit ballot" `c`, initiall `NULL`.  `ccounter` is 0 when while
+  `c` is `NULL` and `c.counter` otherwise.  `c` is updated as follows:
 
+    * If either `prepared` or `preparedPrime` has `counter` greater
+      than `c.counter` and a different `value`, then reset `c = cNULL`.
 
+    * If `c == NULL` and the highest confirmed prepared ballot `h`
+      (the one thet determines `hcounter`) hasn't been aborted by
+      `prepared` or `preparedPrime`, then set `c` to the lowest ballot
+      such that `c.value == h.value && c.counter <= h.counter &&
+      ballot <= c`.
 
-`counter` beings at 1 for each slot, and is incremented to higher
-numbers if the first ballot fails to reach consensus on an output
-value.  `value` is initially chosen as the output of the deterministic
-combining function applied to all values that have been confirmed
-nominated for the slot.  Note, however, that this output may change in
-subsequent ballots if more values have been confirmed nominated in the
-background.  Moreover, as described below, the set of nominated values
-becomes irrelevant to as soon any ballot has made it beyond a certain
-point in the protocol before failing.
-
-
-
-Nodes send the following concrete message in the prepare phase:
-
-The fields have the following meaning:
-
-* `ballot` - the current ballot, determined as discussed below.  This
-  field conveys the set of conceptual messages _vote-or-abort_
-  `prepare(ballot)`.
-
-* `prepared` - the highest ballot `b` for which the sender has
-  accepted `prepared(b)`.  More specifically, `prepared` contains the
-  highest `b` for which one of the following two conditions has been
-  met:
-    * The sending node is part of a quorum in which, for each node,
-      there is some ballot `b1` in the `ballot`, `prepared`, or
-      `preparedPrime` field of its latest `SCPPrepare` message such
-      that `b1.value == b.value && b1.counter >= b.counter`, or
-    * There is a set reaching blocking threshold at the sender such
-      that for each node in the set, there is some ballot `b1` in the
-      `prepared`, or `preparedPrime` field of its latest `SCPPrepare`
-      message such that `b1.value == b.value && b1.counter >=
-      b.counter`.
-  If no such ballot `b` exists, then `prepared` is `NULL`.
-
-* `preparedPrime` - the highest ballot `b` satisfying the same
-  criteria as `prepared` with the additional constraint that
-  `preparedPrime.value != prepared.value`.  `preparedPrime` is `NULL`
-  if no such ballot exists.
-
-* `nH` - the counter from the highest ballot `<n,x>` for which the
-  sender is in a quorum in which each member has sent an `SCPPrepare`
-  message with one of the following properties (or `nH = 0` if no such
-  ballot exists):
-    * The `prepared` field contains `<n',x>` where `n' >= n`, or
-    * The `preparedPrime` field contains `<n',x'>` where `n' >= n` and
-      `x'` can be any value.
-
-* `nC` - the counter for the lowest ballot the sender is attempting to
-  confirm (see below), otherwise 0.
-
-The `value` field `x` of each ballot is selected as follows.  If `nH =
-0`, then use the deterministic combination function on all values that
-have made it all the way through the nomination protocol to produce a
-candidate value.  Otherwise, use the value `x` associated with the
-ballot that produced `nH`.
-
-The `counter` field `n` of each ballot is selected as follows.
-
-* Initially, `n = 1`.
-
-* If a node is still sending `SCPPrepare` or `SCPConfirm` messages
-  (meaning it has not yet output a value for a particular slot), then
-  a node arms a timer whenever `n` reaches quorum threshold of ballots
-  (meaning the node is a member of a quorum in which each member is
-  sending explicit or implicit `SCPPrepare` messages with ballot
-  `counter` >= `n`).
-
-* If the timer fires, a node increments `n` and determines a new value
-  depending on the latest state of the nomination protocol and `nH`,
-  as discussed above.
-
-* If a `counter` value greater than `n` ever reaches a blocking
-  threshold, then a node immediately disables any pending timer and
-  increases `n` to the blocking `counter` value, recomputing `value`
-  in the usual way.
-
-The value `nC` is maintained based on an internally-maintained "commit
-ballot" `c`, where initially `c = cNULL = <0, NULL>` (for some
-arbitrary or invalid value `NULL`).
-
-* If either `prepared` or `preparedPrime` has `counter` greater than
-  `c`'s and a different `value`, then reset `c = cNULL`.
-
-* If `c = cNULL` and the ballot determining `nH` hasn't been
-  aborted by `prepared` or `preparedPrime`, then set `c` to the lowest
-  ballot containing the value of that (`nH`) ballot that is between
-  `ballot` and the `nH` ballot.
-
-* If some ballot with the same value reaches quorum threshold betwen
-  `c` and the `nH` ballot, move to the confirm phase.
+    * If _commit_ of any ballot betwen `c` and `h` reaches quorum
+      threshold, move to the CONFIRM phase.
 
 ## Confirm messages
 
