@@ -765,7 +765,8 @@ messages:
 * `vote-or-accept prepare(<infinity, commit.value>)`
 * `confirm prepare(<infinity, commit.value>)`
 
-The fields are set as follows
+The fields are set as follows:
+
 `commit`
 : The lowest confirmed committed ballot.
 
