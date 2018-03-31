@@ -753,7 +753,7 @@ struct SCPExternalize
 {
     SCPBallot commit;         // c
     uint32 hCounter;          // h.counter
-} externalize;
+};
 ~~~~~
 
 An `SCPExternalize` message conveys the following federated voting
