@@ -1,0 +1,18 @@
+<reference anchor='building-blocks'>
+
+<front>
+<title>The Building Blocks of Consensus</title>
+<author initials='Y.' surname='Song' fullname='Yee Jiun Song'>
+<organization /></author>
+<author initials='R.' surname='van Renesse' fullname='Robbert van Renesse'>
+<organization /></author>
+<author initials='F.' surname='Schneider' fullname='Fred B. Schneider'>
+<organization /></author>
+<author initials='D.' surname='Dolev' fullname='Danny Dolev'>
+<organization /></author>
+<date year='2008' />
+</front>
+
+  <seriesInfo name="9th International Conference on Distributed
+		    Computing and Networking" value="pp. 54--72" />
+</reference>

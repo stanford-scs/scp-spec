@@ -7,7 +7,7 @@
 % workgroup = ""
 % keyword = ["consensus"]
 %
-% date = 2018-03-30T00:00:00Z
+% date = 2018-04-19T00:00:00Z
 %
 % [[author]]
 % initials="N."
@@ -177,8 +177,8 @@ for the slot's output.  5 seconds after completing one slot, the
 protocol runs again for the next slot.
 
 A value typically encodes a set of actions to apply to a replicated
-state machine.  During the pause between slots, nodes to accumulate
-the next set of actions, thus amortizing the cost of consensus over
+state machine.  During the pause between slots, nodes accumulate the
+next set of actions, thus amortizing the cost of consensus over
 arbitrarily many individual state machine operations.
 
 In practice, only one or a small number of nodes' input values
@@ -190,15 +190,16 @@ often it appears in other nodes' quorum slices.
 
 From SCP's perspective, values are just opaque byte arrays whose
 interpretation is left to higher-layer software.  However, SCP
-requires a _combining function_ that reduces multiple candidate values
-into a single _composite_ value.  When nodes nominate multiple values
-for a slot, SCP nodes invoke this function to converge on a single
-composite value.  By way of example, in an application where values
-consist of sets of transactions, the combining function could take the
-union of transaction sets.  Alternatively, if values represent a
-timestamp and a set of transactions, the combining function might pair
-the highest nominated timestamp with the transaction set that has the
-highest hash value.
+requires a _validity_ function (to check whether a value is valid) and
+a _combining function_ that reduces multiple candidate values into a
+single _composite_ value.  When nodes nominate multiple values for a
+slot, SCP nodes invoke this function to converge on a single composite
+value.  By way of example, in an application where values consist of
+sets of transactions, the combining function could take the union of
+transaction sets.  Alternatively, if values represent a timestamp and
+a set of transactions, the combining function might pair the highest
+nominated timestamp with the transaction set that has the highest hash
+value.
 
 # Protocol
 
@@ -227,11 +228,12 @@ guarantees two things:
 2. If a node that is guaranteed safety by #1 confirms a statement `a`,
    and that node is a member of one or more quorums consisting
    entirely of well-behaved nodes, then eventually every member of
-   every such a quorum will also confirm `a`.
+   every such quorum will also confirm `a`.
 
 Intuitively, these conditions are key to ensuring agreement among
-nodes as well as a weak form of liveness (absence of stuck states)
-that is compatible with the FLP impossibility result [@?FLP].
+nodes as well as a weak form of liveness (the non-blocking property
+[@?building-blocks]) that is compatible with the FLP impossibility
+result [@?FLP].
 
 As a node `v` collects signed copies of a federated voting message `m`
 from peers, two thresholds trigger state transitions in `v` depending
@@ -403,8 +405,8 @@ when three things hold:
 A message reaches blocking threshold at `v` when the number of
 `validators` making the statement plus (recursively) the number
 `innerSets` reaching blocking threshold exceeds `n-k`.  (Blocking
-threshold is a local property that does not require a recursive check
-on other nodes like step #3 above.)
+threshold depends only on the local nodes quorum slices and hence does
+not require a recursive check on other nodes like step #3 above.)
 
 As described in (#message-envelopes), every protocol message is paired
 with a cryptographic hash of the sender's `SCPQuorumSet` and digitally
@@ -457,11 +459,19 @@ For each round `n` until nomination has finished (see below), a node
 starts _echoing_ the available peer `v` with the highest value of
 `priority(n, v)` from among the nodes in `neighbors(n)`.  To echo `v`,
 the node merges any valid values from `v`'s `votes` and `accepted`
-sets to its own `votes` set.  The notion of message validity is
-dictated by higher-layer software, but should be mostly independent of
-replicated state.  For instance, nodes might check that values can be
-syntactically parsed, that signed transactions have correct digital
-signatures, and that timestamp fields are not in the future.
+sets to its own `votes` set.  Values rejected by the higher-layer
+application's validity function are ignored.
+
+The validity function must not depend on state that can permanently
+differ across nodes.  By way of example, it is okay to reject values
+that are syntactically ill-formed, that are semantically incompatible
+with the previous slot's value, that contain invalid digital
+signatures, that contain timestamps more than 5 seconds in the future,
+or that specify upgrades to unknown versions of the protocol.  By
+contrast, a the application cannot reject values that are incompatible
+with the results of a DNS query or some dynamically retrieved TLS
+certificate, as different nodes could see different results when doing
+such queries.
 
 Nodes must not send an `SCPNomination` message until at least one of
 the `votes` or `accepted` fields is non-empty.  When these fields are
@@ -598,8 +608,8 @@ these ballots to set the following fields of its own `SCPPrepare`
 messages as follows.
 
 `prepared`
-: The highest accepted prepared ballot or or NULL if no ballot has
-  been accepted prepared
+: The highest accepted prepared ballot or NULL if no ballot has been
+  accepted prepared
 
 `preparedPrime`
 : The highest accepted prepared ballot such that `preparedPrime.value
@@ -622,12 +632,15 @@ messages as follows.
     * Upon entering the PREPARE phase, the `counter` field is
       initialized to 1.
 
-    * When a node sees sees messages from a quorum to which it belongs
-      such that each message's `ballot.counter` is greater than or
-      equal to the local `ballot.counter`, the node arms a timer for
-      its local `ballot.counter + 1` seconds.  (Note that this
-      includes `ballot` fields in `SCPCommit` and `SCPExternalize`
-      messages as well as `SCPPrepare`.)
+    * When a node sees messages from a quorum to which it belongs such
+      that each message's `ballot.counter` is greater than or equal to
+      the local `ballot.counter`, the node arms a timer to fire in a
+      number of seconds equal to its `ballot.counter + 1` (so the
+      timeout lengthens linearly as the counter increases).  Note that
+      for the purposes of determining whether a quorum has a
+      particular `ballot.counter`, a node considers `ballot` fields in
+      `SCPCommit` and `SCPExternalize` messages as well as
+      `SCPPrepare`.
 
     * If the timer fires, a node increments the ballot counter and
       determines a new `value` according to the rules for the
@@ -635,23 +648,23 @@ messages as follows.
 
     * If nodes forming a blocking threshold all have `ballot.counter`
       values greater than the local `ballot.counter`, then the local
-      node immediately increases `ballot.counter` to the lowest value
-      such that this is no longer the case.  (When doing so, it also
-      disables any pending timers associated with the old `counter`.)
+      node immediately cancels any pending timer, increases
+      `ballot.counter` to the lowest value such that this is no longer
+      the case, and if appropriate according to the rules above may
+      arm a new timer.
 
     * If a new ballot `h` is confirmed prepared such that `ballot <
       h`, then immediately set `ballot` to `h`.  
       <!-- -->
       XXX - can this ever happen?
 
-    * To avoid exhausting the counter cannot be exhausted,
-      `ballot.counter` must always be less then 1,000,000 plus the
-      number of seconds a node has been running SCP on the current
-      slot.  Should any of the above rules require increasing the
-      counter beyond this value, a node either simply increase
-      `ballot.counter` to the maximum permissible value, or if it is
-      already at its maximum, wait up to one second before increasing
-      the value.
+    * To avoid exhausting the counter, `ballot.counter` must always be
+      less then 1,000,000 plus the number of seconds a node has been
+      running SCP on the current slot.  Should any of the above rules
+      require increasing the counter beyond this value, a node either
+      increases `ballot.counter` to the maximum permissible value, or,
+      if it is already at this maximum, waits up to one second before
+      increasing the value.
 
 `ballot.value`
 : Each time the ballot counter is changed, the value is also
@@ -659,15 +672,15 @@ messages as follows.
   then the `ballot.value` is taken to to be `h.value` for the highest
   confirmed prepared ballot `h`.  Otherwise (if `hCounter == 0`), the
   value is taken as the output of the deterministic combining function
-  applied to all confirmed nominated values.  Note the that of
+  applied to all confirmed nominated values.  Note that the set of
   confirmed nominated values may continue to grow in the background
   during the balloting phase, so `ballot.value` may change even while
   `hCounter == 0`.
 
 `cCounter`
 : The value `cCounter` is maintained based on an internally-maintained
-  "commit ballot" `c`, initiall `NULL`.  `cCounter` is 0 when while
-  `c` is `NULL` and `c.counter` otherwise.  `c` is updated as follows:
+  "commit ballot" `c`, initiall `NULL`.  `cCounter` is 0 while `c` is
+  `NULL` and is `c.counter` otherwise.  `c` is updated as follows:
 
     * If either `prepared > c && prepared.value != c.value` or
       `preparedPrime > c && preparedPrime.value != c.value`, then
@@ -679,10 +692,10 @@ messages as follows.
       such that `c.value == h.value && c.counter <= h.counter &&
       ballot <= c`.  
       <!-- -->
-      XXX - just to set `c = ballot` given `ballot` rules?
+      XXX - just set `c = ballot` given `ballot` rules?
 
 The PREPARE phase ends at a node when the statement `commit b` reaches
-the accept state in federated voting for some ballot `b`.
+the accepted state in federated voting for some ballot `b`.
 
 ## Commit messages
 
@@ -702,7 +715,7 @@ struct SCPCommit
 
 The message conveys the following federated vote messages, where where
 `infinity` is 2^{32} (a value greater than any ballot counter
-representable in marshaled form):
+representable in serialized form):
 
 * `accept commit <n, ballot.value>` for every `cCounter <= n <= hCounter`
 * `vote-or-accept prepare(<infinity, ballot.value>)`
@@ -792,8 +805,9 @@ enum SCPStatementType
 
 struct SCPStatement
 {
-    NodeID nodeID;    // v (node signing message)
-    uint64 slotIndex; // i
+    NodeID nodeID;      // v (node signing message)
+    uint64 slotIndex;   // i
+    Hash quorumSetHash; // hash of serialized SCPQuorumSet
 
     union switch (SCPStatementType type)
     {
@@ -829,8 +843,9 @@ IRTF DIN group including Dirk Kutscher, Sydney Li, Colin Man, Melinda
 Shore, and Jean-Luc Watson helped with the framing and motivation for
 this specification.
 
-{{reference.scp.xml}}
+{{reference.building-blocks.xml}}
 {{reference.flp.xml}}
+{{reference.scp.xml}}
 
 {backmatter}
 
