@@ -778,7 +778,7 @@ sends the following message:
 ~~~~~ {.xdr}
 struct SCPExternalize
 {
-    SCPBallot commit;         // c
+    SCPBallot ballot;         // c
     uint32 hCounter;          // h.counter
 };
 ~~~~~
@@ -786,15 +786,15 @@ struct SCPExternalize
 An `SCPExternalize` message conveys the following federated voting
 messages:
 
-* `accept commit <n, commit.value>` for every `n >= commit.counter`
-* `confirm commit <n, commit.value>` for every
-  `commit.counter <= n <= hCounter`
-* `vote-or-accept prepare(<infinity, commit.value>)`
-* `confirm prepare(<infinity, commit.value>)`
+* `accept commit <n, ballot.value>` for every `n >= ballot.counter`
+* `confirm commit <n, ballot.value>` for every
+  `ballot.counter <= n <= hCounter`
+* `vote-or-accept prepare(<infinity, ballot.value>)`
+* `confirm prepare(<infinity, ballot.value>)`
 
 The fields are set as follows:
 
-`commit`
+`ballot`
 : The lowest confirmed committed ballot.
 
 `hCounter`
@@ -855,7 +855,8 @@ The Stellar development foundation supported development of the
 protocol and produced the first production deployment of SCP.  The
 IRTF DIN group including Dirk Kutscher, Sydney Li, Colin Man, Melinda
 Shore, and Jean-Luc Watson helped with the framing and motivation for
-this specification.
+this specification.  We also thank Bob Glickstein for feedback on this
+draft.
 
 {{reference.building-blocks.xml}}
 {{reference.flp.xml}}
