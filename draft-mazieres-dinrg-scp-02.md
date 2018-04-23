@@ -24,6 +24,20 @@
 %   country = "US"
 %
 % [[author]]
+% initials="G."
+% surname="Losa"
+% fullname="Giuliano Losa"
+% #role="editor"
+% organization = "UCLA"
+%   [author.address]
+%   email = "giuliano@cs.ucla.edu"
+%   [author.address.postal]
+%   street = "3753 Keystone Avenue #10"
+%   city = "Los Angeles, CA"
+%   code = "90034"
+%   country = "US"
+%
+% [[author]]
 % initials="D."
 % surname="Mazieres"
 % fullname="David Mazieres"
