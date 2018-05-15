@@ -264,7 +264,7 @@ Each node `v` can send several types of message with respect to a
 statement `a` during federated voting:
 
 * _vote_ `a` states that `a` is a valid statement and constitutes a
-  promise by `v` not to vote for any contradictory message, such as
+  promise by `v` not to vote for any contradictory statement, such as
   `!a`.
 
 * _accept_ `a` says that nodes may or may not come to agree on `a`,
@@ -366,7 +366,7 @@ case PUBLIC_KEY_TYPE_ED25519:
 typedef opaque Signature<64>;
 ~~~~~
 
-Nodes are public keys, while values are simply opaque arrays of byes.
+Nodes are public keys, while values are simply opaque arrays of bytes.
 
 ~~~~~ {.xdr}
 typedef PublicKey NodeID;
@@ -376,7 +376,7 @@ typedef opaque Value<>;
 
 ## Quorum slices
 
-Theoretically a quorum slice can be an arbitrary set of sets of nodes.
+Theoretically a quorum slice can be an arbitrary set of nodes.
 However, arbitrary predicates on sets cannot be encoded concisely.
 Instead we specify quorum slices as any set of k-of-n members, where
 each of the n members can either be an individual node ID, or,
@@ -444,7 +444,7 @@ struct SCPNomination
 ~~~~~
 
 The `votes` and `accepted` sets are disjoint; any value that is
-eligible for for both sets is placed only in the `accepted` set.
+eligible for both sets is placed only in the `accepted` set.
 
 `votes` consists of candidate values nominated by the sender.  Each
 node progresses through a series of nomination _rounds_ in which it
@@ -461,7 +461,7 @@ should incorporate in its own `SCPNomination` message as follows:
   multiple of 4 bytes.  Treat the output of `Gi` as a 256-bit binary
   number in big-endian format.
 
-* For each peer `v`, define `weight(v)` as the faction of quorum
+* For each peer `v`, define `weight(v)` as the fraction of quorum
   slices containing `v`.
 
 * Define the set of nodes `neighbors(n)` as the set of nodes v for
@@ -482,7 +482,7 @@ that are syntactically ill-formed, that are semantically incompatible
 with the previous slot's value, that contain invalid digital
 signatures, that contain timestamps more than 5 seconds in the future,
 or that specify upgrades to unknown versions of the protocol.  By
-contrast, a the application cannot reject values that are incompatible
+contrast, the application cannot reject values that are incompatible
 with the results of a DNS query or some dynamically retrieved TLS
 certificate, as different nodes could see different results when doing
 such queries.
@@ -551,7 +551,7 @@ and `value == x`.
 Ballots are totally ordered with `counter` more significant than
 `value`.  Hence, we write `b1 < b2` to mean that either `b1.counter <
 b2.counter` or `b1.counter == b2.counter && b1.value < b2.value`.
-(Values are compared lexicographically as a strings of unsigned
+(Values are compared lexicographically as strings of unsigned
 octets.)
 
 The protocol moves through federated voting on successively higher
@@ -565,7 +565,7 @@ two restrictions on voting:
    ballot (the two outcomes are contradictory), and
 
 2. A node may not vote for `commit b` for any ballot `b` unless it has
-   aborted every lesser ballot with a different value.
+   confirmed aborted every lesser ballot with a different value.
 
 The second condition requires voting to abort large numbers of ballots
 before voting to commit a ballot `b`.  We call this _preparing_ ballot
@@ -673,7 +673,7 @@ messages as follows.
       XXX - can this ever happen?
 
     * To avoid exhausting the counter, `ballot.counter` must always be
-      less then 1,000,000 plus the number of seconds a node has been
+      less than 1,000,000 plus the number of seconds a node has been
       running SCP on the current slot.  Should any of the above rules
       require increasing the counter beyond this value, a node either
       increases `ballot.counter` to the maximum permissible value, or,
@@ -727,7 +727,7 @@ struct SCPCommit
 };
 ~~~~~
 
-The message conveys the following federated vote messages, where where
+The message conveys the following federated vote messages, where
 `infinity` is 2^{32} (a value greater than any ballot counter
 representable in serialized form):
 
