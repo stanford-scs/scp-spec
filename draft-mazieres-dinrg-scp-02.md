@@ -419,8 +419,8 @@ when three things hold:
 A message reaches blocking threshold at `v` when the number of
 `validators` making the statement plus (recursively) the number
 `innerSets` reaching blocking threshold exceeds `n-k`.  (Blocking
-threshold depends only on the local nodes quorum slices and hence does
-not require a recursive check on other nodes like step #3 above.)
+threshold depends only on the local node's quorum slices and hence
+does not require a recursive check on other nodes like step #3 above.)
 
 As described in (#message-envelopes), every protocol message is paired
 with a cryptographic hash of the sender's `SCPQuorumSet` and digitally
@@ -454,20 +454,19 @@ messages received from a growing set of peers.  In round `n` of slot
 `i`, each node determines an additional peer whose nominated values it
 should incorporate in its own `SCPNomination` message as follows:
 
-* Let `Gi(m) = SHA-256(i || output[i-1] || m)`, where `output[i-1]` is
-  the consensus output of slot i-1 for slot i > 1 and the zero-byte
-  value for slot 1.  Recall that values are encoded as an XDR opaque
-  vector, with a 32-byte length followed by contents zero-padded to a
-  multiple of 4 bytes.  Treat the output of `Gi` as a 256-bit binary
-  number in big-endian format.
+* Let `Gi(m) = SHA-256(i || m)`, where `||` denotes the concatenation
+  of serialized XDR values.  Treat the output of `Gi` as a 256-bit
+  binary number in big-endian format.
 
 * For each peer `v`, define `weight(v)` as the faction of quorum
   slices containing `v`.
 
 * Define the set of nodes `neighbors(n)` as the set of nodes v for
-  which `Gi("N" || n || v) < 2^{256} * weight(v)`.
+  which `Gi(1 || n || v) < 2^{256} * weight(v)`, where `1` and `n` are
+  both 32-bit XDR `int` values.
 
-* Define `priority(n, v)` as `Gi("P" || n || v)`.
+* Define `priority(n, v)` as `Gi(2 || n || v)`, where `2` and `n` are
+  both 32-bit XDR `int` values.
 
 For each round `n` until nomination has finished (see below), a node
 starts _echoing_ the available peer `v` with the highest value of
