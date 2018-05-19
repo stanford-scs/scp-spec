@@ -470,21 +470,22 @@ should incorporate in its own `SCPNomination` message as follows:
 
 For each round `n` until nomination has finished (see below), a node
 starts _echoing_ the available peer `v` with the highest value of
-`priority(n, v)` from among the nodes in `neighbors(n)`.  To echo `v`,
-the node merges any valid values from `v`'s `votes` and `accepted`
-sets to its own `votes` set.  Values rejected by the higher-layer
-application's validity function are ignored.
+`priority(n, v)` from among the nodes in `neighbors(n)`.  Echoing a
+peer `v` means merging any valid values from `v`'s `votes` and
+`accepted` sets to one's own `votes` set.  However, values rejected by
+the higher-layer application's validity function are ignored and not
+merged.
 
 The validity function must not depend on state that can permanently
 differ across nodes.  By way of example, it is okay to reject values
 that are syntactically ill-formed, that are semantically incompatible
 with the previous slot's value, that contain invalid digital
-signatures, that contain timestamps more than 5 seconds in the future,
-or that specify upgrades to unknown versions of the protocol.  By
-contrast, a the application cannot reject values that are incompatible
-with the results of a DNS query or some dynamically retrieved TLS
-certificate, as different nodes could see different results when doing
-such queries.
+signatures, that contain timestamps in the future, or that specify
+upgrades to unknown versions of the protocol.  By contrast, the
+application cannot reject values that are incompatible with the
+results of a DNS query or some dynamically retrieved TLS certificate,
+as different nodes could see different results when doing such
+queries.
 
 Nodes must not send an `SCPNomination` message until at least one of
 the `votes` or `accepted` fields is non-empty.  When these fields are
@@ -564,7 +565,7 @@ two restrictions on voting:
    ballot (the two outcomes are contradictory), and
 
 2. A node may not vote for `commit b` for any ballot `b` unless it has
-   aborted every lesser ballot with a different value.
+   confirmed `abort` for every lesser ballot with a different value.
 
 The second condition requires voting to abort large numbers of ballots
 before voting to commit a ballot `b`.  We call this _preparing_ ballot
