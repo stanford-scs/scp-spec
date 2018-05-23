@@ -621,24 +621,11 @@ of what ballots have been accepted and confirmed prepared.  It uses
 these ballots to set the following fields of its own `SCPPrepare`
 messages as follows.
 
-`prepared`
-: The highest accepted prepared ballot or NULL if no ballot has been
-  accepted prepared
-
-`preparedPrime`
-: The highest accepted prepared ballot such that `preparedPrime.value
-  != prepared.value`, or NULL if there is no such ballot
-
-`hCounter`
-: The `counter` field of the highest confirmed prepared ballot, or 0
-  if no ballot has been confirmed prepared (Only the counter is
-  included because the `value` of the highest confirmed prepared
-  ballot is always the same as `ballot.value`.)
-
-
 `ballot`
 : The current ballot that a node is attempting to prepare and commit.
-  The rules for setting each field are detailed below.
+  The rules for setting each of the two fields are detailed below.
+  Note that the `value` is updated when and only when `counter`
+  changes.
 
 `ballot.counter`
 :  The counter is set according to the following rules:
@@ -656,57 +643,68 @@ messages as follows.
       `SCPCommit` and `SCPExternalize` messages as well as
       `SCPPrepare`.
 
-    * If the timer fires, a node increments the ballot counter and
-      determines a new `value` according to the rules for the
-      `ballot.value` field.
+    * If the timer fires, a node increments the ballot counter by 1.
 
     * If nodes forming a blocking threshold all have `ballot.counter`
       values greater than the local `ballot.counter`, then the local
       node immediately cancels any pending timer, increases
       `ballot.counter` to the lowest value such that this is no longer
-      the case, and if appropriate according to the rules above may
-      arm a new timer.
+      the case, and if appropriate according to the rules above arms a
+      new timer.
 
-    * If a new ballot `h` is confirmed prepared such that `ballot <
-      h`, then immediately set `ballot` to `h`.  
-      <!-- -->
-      XXX - can this ever happen?
-
-    * To avoid exhausting the counter, `ballot.counter` must always be
-      less then 1,000,000 plus the number of seconds a node has been
-      running SCP on the current slot.  Should any of the above rules
-      require increasing the counter beyond this value, a node either
-      increases `ballot.counter` to the maximum permissible value, or,
-      if it is already at this maximum, waits up to one second before
-      increasing the value.
+    * **Exception**: To avoid exhausting `ballot.counter`, its value
+      must always be less then 1,000 plus the number of seconds a node
+      has been running SCP on the current slot.  Should any of the
+      above rules require increasing the counter beyond this value, a
+      node either increases `ballot.counter` to the maximum
+      permissible value, or, if it is already at this maximum, waits
+      up to one second before increasing the value.
 
 `ballot.value`
 : Each time the ballot counter is changed, the value is also
   recomputed as follows:  If any ballot has been confirmed prepared,
-  then the `ballot.value` is taken to to be `h.value` for the highest
-  confirmed prepared ballot `h`.  Otherwise (if `hCounter == 0`), the
-  value is taken as the output of the deterministic combining function
-  applied to all confirmed nominated values.  Note that the set of
-  confirmed nominated values may continue to grow in the background
-  during the balloting phase, so `ballot.value` may change even while
-  `hCounter == 0`.
+  then `ballot.value` is taken to to be `h.value` for the highest
+  confirmed prepared ballot `h`.  Otherwise (if no such `h` exists),
+  the value is taken as the output of the deterministic combining
+  function applied to all confirmed nominated values.  Note that the
+  set of confirmed nominated values may continue to grow in the
+  background during balloting, so `ballot.value` may change even if no
+  ballots are confirmed prepared.
+
+`prepared`
+: The highest accepted prepared ballot not exceeding the `ballot`
+  field, or NULL if no ballot has been accepted prepared.  (Note the
+  only condition in which the highest accepted prepared ballot might
+  exceed `ballot` is the corner case in which a higher counter reaches
+  blocking threshold but `ballot.counter` is at its temporary
+  maximum.)
+
+`preparedPrime`
+: The highest accepted prepared ballot such that `preparedPrime <
+  prepared` and `preparedPrime.value != prepared.value`, or NULL if
+  there is no such ballot.  Note that together, `prepared` and
+  `preparedPrime` concisely encode all `abort` statements (below
+  `ballot`) that the sender has accepted.
+
+`hCounter`
+: If `h` is the highest confirmed prepared ballot and `h.value ==
+  ballot.value`, then this field is set to `h.counter`.  Otherwise, if
+  no ballot is confirmed prepared or if `h.value != ballot.value`,
+  then this field is 0.  Note that by the rules above, if `h` exists,
+  then `ballot.value` will be set to `h.value` the next time `ballot`
+  is updated.
 
 `cCounter`
 : The value `cCounter` is maintained based on an internally-maintained
-  "commit ballot" `c`, initiall `NULL`.  `cCounter` is 0 while `c` is
+  _commit ballot_ `c`, initially `NULL`.  `cCounter` is 0 while `c` is
   `NULL` and is `c.counter` otherwise.  `c` is updated as follows:
 
-    * If either `prepared > c && prepared.value != c.value` or
-      `preparedPrime > c && preparedPrime.value != c.value`, then
+    * If either `(prepared > c && prepared.value != c.value)` or
+      `(preparedPrime > c && preparedPrime.value != c.value)`, then
       reset `c = NULL`.
 
-    * If `c == NULL` and the highest confirmed prepared ballot `h`
-      (the one that determines `hCounter`) hasn't been aborted by
-      `prepared` or `preparedPrime`, then set `c` to the lowest ballot
-      such that `c.value == h.value && c.counter <= h.counter &&
-      ballot <= c`.  
-      <!-- -->
-      XXX - just set `c = ballot` given `ballot` rules?
+    *  If `c == NULL` and `hCounter == ballot.counter` (meaning
+       `ballot` is confirmed prepared), then set `c` to `ballot`.
 
 The PREPARE phase ends at a node when the statement `commit b` reaches
 the accepted state in federated voting for some ballot `b`.
