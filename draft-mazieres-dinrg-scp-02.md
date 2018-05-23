@@ -639,9 +639,9 @@ messages as follows.
       number of seconds equal to its `ballot.counter + 1` (so the
       timeout lengthens linearly as the counter increases).  Note that
       for the purposes of determining whether a quorum has a
-      particular `ballot.counter`, a node considers `ballot` fields in
-      `SCPCommit` and `SCPExternalize` messages as well as
-      `SCPPrepare`.
+      particular `ballot.counter`, a node also considers `ballot`
+      fields in `SCPCommit` and considers `SCPExternalize` messages to
+      contain an implicit `ballot.counter` of `infinity`.
 
     * If the timer fires, a node increments the ballot counter by 1.
 
@@ -650,7 +650,9 @@ messages as follows.
       node immediately cancels any pending timer, increases
       `ballot.counter` to the lowest value such that this is no longer
       the case, and if appropriate according to the rules above arms a
-      new timer.
+      new timer.  Note that the blocking threshold may include ballots
+      from `SCPCommit` messages as well as `SCPExternalize` messages,
+      which implicitly have an infinite ballot counter.
 
     * **Exception**: To avoid exhausting `ballot.counter`, its value
       must always be less then 1,000 plus the number of seconds a node
@@ -767,12 +769,12 @@ accepted `commit c`.  (No value is included in messages since `h.value
 == ballot.value`.)
 
 As soon as a node confirms `commit b` for any ballot `b`, it moves to
-the EXTERNALIZE stage.
+the EXTERNALIZE phase.
 
 ## Externalize messages
 
-A node enters the EXTERNALIZE when it confirms `commit b` for any
-ballot `b`.  As soon as this happens, SCP outputs `b.value` as the
+A node enters the EXTERNALIZE phase when it confirms `commit b` for
+any ballot `b`.  As soon as this happens, SCP outputs `b.value` as the
 value of the current slot.  In order to help other nodes achieve
 consensus on the slot more quickly, a node reaching this phase also
 sends the following message:
@@ -780,7 +782,7 @@ sends the following message:
 ~~~~~ {.xdr}
 struct SCPExternalize
 {
-    SCPBallot ballot;         // c
+    SCPBallot commit;         // c
     uint32 hCounter;          // h.counter
 };
 ~~~~~
@@ -788,15 +790,14 @@ struct SCPExternalize
 An `SCPExternalize` message conveys the following federated voting
 messages:
 
-* `accept commit <n, ballot.value>` for every `n >= ballot.counter`
-* `confirm commit <n, ballot.value>` for every
-  `ballot.counter <= n <= hCounter`
-* `vote-or-accept prepare(<infinity, ballot.value>)`
-* `confirm prepare(<infinity, ballot.value>)`
+* `accept commit <n, commit.value>` for every `n >= commit.counter`
+* `confirm commit <n, commit.value>` for every
+  `commit.counter <= n <= hCounter`
+* `confirm prepare(<infinity, commit.value>)`
 
 The fields are set as follows:
 
-`ballot`
+`commit`
 : The lowest confirmed committed ballot.
 
 `hCounter`
