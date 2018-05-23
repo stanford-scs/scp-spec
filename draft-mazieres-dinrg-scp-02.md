@@ -706,8 +706,12 @@ messages as follows.
     *  If `c == NULL` and `hCounter == ballot.counter` (meaning
        `ballot` is confirmed prepared), then set `c` to `ballot`.
 
-The PREPARE phase ends at a node when the statement `commit b` reaches
-the accepted state in federated voting for some ballot `b`.
+A node leaves the PREPARE phase and proceeds to the COMMIT phase when
+there is some ballot `b` for which the node confirms `prepare(b)` and
+accepts `commit b`.  (If nodes never changed quorum slice
+mid-protocol, it would suffice to accept `commit b`.  Also waiting to
+confirm `prepare(b)` makes it easier to recover from liveness failures
+by removing Byzantine faulty nodes from quorum slices.)
 
 ## Commit messages
 
