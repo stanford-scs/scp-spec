@@ -344,7 +344,7 @@ represents hash values as a simple array of 32 bytes.
 typedef opaque Hash[32];
 ~~~~~
 
-SCP employes the Ed25519 digital signature algorithm [@!RFC8032].  For
+SCP employs the Ed25519 digital signature algorithm [@!RFC8032].  For
 cryptographic agility, however, public keys are represented as a union
 type that can later be compatibly extended with other key types.
 
@@ -425,7 +425,7 @@ does not require a recursive check on other nodes like step #3 above.)
 As described in (#message-envelopes), every protocol message is paired
 with a cryptographic hash of the sender's `SCPQuorumSet` and digitally
 signed.  Inner protocol messages described in the next few sections
-should be understood to be received in alongside such a quorum slice
+should be understood to be received alongside such a quorum slice
 specification and digital signature.
 
 ## Nomination
@@ -444,7 +444,7 @@ struct SCPNomination
 ~~~~~
 
 The `votes` and `accepted` sets are disjoint; any value that is
-eligible for for both sets is placed only in the `accepted` set.
+eligible for both sets is placed only in the `accepted` set.
 
 `votes` consists of candidate values nominated by the sender.  Each
 node progresses through a series of nomination _rounds_ in which it
@@ -612,9 +612,12 @@ voting messages:
 * If `cCounter != 0`: `vote commit <n, ballot.value>` for every
   `cCounter <= n <= hCounter`
 
-Note that to be valid, an `SCPPrepare` message must satisfy
-`preparedPrime < prepared <= ballot` (for any non-NULL `prepared` and
-`preparedPrime`), and `cCounter <= hCounter <= ballot.counter`.
+Note that to be valid, an `SCPPrepare` message must satisfy:
+
+* If `prepared != NULL`, then `prepared <= ballot`,
+* If `preparedPrime != NULL`, then `prepared != NULL` and
+  `preparedPrime < prepared`, and
+* `cCounter <= hCounter <= ballot.counter`.
 
 Based on the federated vote messages received, each node keeps track
 of what ballots have been accepted and confirmed prepared.  It uses
@@ -731,7 +734,7 @@ struct SCPCommit
 };
 ~~~~~
 
-The message conveys the following federated vote messages, where where
+The message conveys the following federated vote messages, where
 `infinity` is 2^{32} (a value greater than any ballot counter
 representable in serialized form):
 
@@ -765,7 +768,7 @@ ballot.value`.)
 
 `hCounter`
 : The counter of the highest ballot `h` for which the node has
-accepted `commit c`.  (No value is included in messages since `h.value
+accepted `commit h`.  (No value is included in messages since `h.value
 == ballot.value`.)
 
 As soon as a node confirms `commit b` for any ballot `b`, it moves to
