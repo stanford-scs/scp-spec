@@ -271,7 +271,7 @@ Each node `v` can send several types of message with respect to a
 statement `a` during federated voting:
 
 * _vote_ `a` states that `a` is a valid statement and constitutes a
-  promise by `v` not to vote for any contradictory message, such as
+  promise by `v` not to vote for any contradictory statement, such as
   `!a`.
 
 * _accept_ `a` says that nodes may or may not come to agree on `a`,
@@ -373,7 +373,7 @@ case PUBLIC_KEY_TYPE_ED25519:
 typedef opaque Signature<64>;
 ~~~~~
 
-Nodes are public keys, while values are simply opaque arrays of byes.
+Nodes are public keys, while values are simply opaque arrays of bytes.
 
 ~~~~~ {.xdr}
 typedef PublicKey NodeID;
@@ -383,7 +383,7 @@ typedef opaque Value<>;
 
 ## Quorum slices
 
-Theoretically a quorum slice can be an arbitrary set of sets of nodes.
+Theoretically a quorum slice can be an arbitrary set of nodes.
 However, arbitrary predicates on sets cannot be encoded concisely.
 Instead we specify quorum slices as any set of k-of-n members, where
 each of the n members can either be an individual node ID, or,
@@ -478,9 +478,9 @@ message as follows:
 
 For each round `n` until nomination has finished (see below), a node
 starts _echoing_ the available peer `v` with the highest value of
-`priority(n, v)` from among the nodes in `neighbors(n)`.  Echoing a
-peer `v` means merging any valid values from `v`'s `voted` and
-`accepted` sets to one's own `voted` set.
+`priority(n, v)` from among the nodes in `neighbors(n)`.  To echo `v`,
+the node merges any valid values from `v`'s `voted` and `accepted`
+sets into its own `voted` set.
 
 XXX - expand `voted` with only the 10 values with lowest Gi hash in
 any given round to avoid blowing out the message size?
@@ -643,9 +643,8 @@ messages as follows.
 
 `ballot`
 : The current ballot that a node is attempting to prepare and commit.
-  The rules for setting each of the two fields are detailed below.
-  Note that the `value` is updated when and only when `counter`
-  changes.
+  The rules for setting each field are detailed below.  Note that the
+  `value` is updated when and only when `counter` changes.
 
 `ballot.counter`
 :  The counter is set according to the following rules:
@@ -659,9 +658,10 @@ messages as follows.
       number of seconds equal to its `ballot.counter + 1` (so the
       timeout lengthens linearly as the counter increases).  Note that
       for the purposes of determining whether a quorum has a
-      particular `ballot.counter`, a node also considers `ballot`
-      fields in `SCPCommit` and considers `SCPExternalize` messages to
-      contain an implicit `ballot.counter` of `infinity`.
+      particular `ballot.counter`, a node considers `ballot` fields in
+      `SCPPrepare` and `SCPCommit` messages.  It also considers
+      `SCPExternalize` messages to convey an implicit `ballot.counter`
+      of `infinity`.
 
     * If the timer fires, a node increments the ballot counter by 1.
 
