@@ -7,7 +7,7 @@
 % workgroup = ""
 % keyword = ["consensus"]
 %
-% date = 2018-05-23T00:00:00Z
+% date = 2018-05-25T00:00:00Z
 %
 % [[author]]
 % initials="N."
@@ -225,6 +225,13 @@ voting with quorum slices is termed _federated voting_.  We describe
 federated voting next, then detail protocol messages in the
 subsections that follow.
 
+The protocol goes through four phases:  NOMINATION, PREPARE, COMMIT,
+and EXTERNALIZE.  The NOMINATION and PREPARE phases run concurrently
+(though PREPARE's messages are sent earlier and it ends before PREPARE
+ends).  The COMMIT and EXTERNALIZE phrases are exclusive, with COMMIT
+occurring immediately after PREPARE and EXTERNALIZE immediately after
+COMMIT.
+
 ## Federated voting
 
 Federated voting is a process through which nodes _confirm_
@@ -432,33 +439,34 @@ specification and digital signature.
 
 For each slot, the SCP protocol begins in a NOMINATION phase whose
 goal is to devise one or more candidate output values for the
-consensus protocol.  Nodes send nomination messages that contain a
-monotonically growing set of values in the following format:
+consensus protocol.  In this phase, nodes send nomination messages
+comprising a monotonically growing set of values:
 
 ~~~~~ {.xdr}
 struct SCPNomination
 {
-    Value votes<>;      // X
+    Value voted<>;      // X
     Value accepted<>;   // Y
 };
 ~~~~~
 
-The `votes` and `accepted` sets are disjoint; any value that is
+The `voted` and `accepted` sets are disjoint; any value that is
 eligible for both sets is placed only in the `accepted` set.
 
-`votes` consists of candidate values nominated by the sender.  Each
-node progresses through a series of nomination _rounds_ in which it
-may increase the set of values in its own `votes` field by adding the
-contents of the `votes` and `accepted` fields of `SCPNomination`
-messages received from a growing set of peers.  In round `n` of slot
-`i`, each node determines an additional peer whose nominated values it
-should incorporate in its own `SCPNomination` message as follows:
+`voted` consists of candidate values that the sender has voted to
+nominate.  Each node progresses through a series of nomination
+_rounds_ in which it may increase the set of values in its own `voted`
+field by adding the contents of the `voted` and `accepted` fields of
+`SCPNomination` messages received from a growing set of peers.  In
+round `n` of slot `i`, each node determines an additional peer whose
+nominated values it should incorporate in its own `SCPNomination`
+message as follows:
 
 * Let `Gi(m) = SHA-256(i || m)`, where `||` denotes the concatenation
   of serialized XDR values.  Treat the output of `Gi` as a 256-bit
   binary number in big-endian format.
 
-* For each peer `v`, define `weight(v)` as the faction of quorum
+* For each peer `v`, define `weight(v)` as the fraction of quorum
   slices containing `v`.
 
 * Define the set of nodes `neighbors(n)` as the set of nodes v for
@@ -471,70 +479,77 @@ should incorporate in its own `SCPNomination` message as follows:
 For each round `n` until nomination has finished (see below), a node
 starts _echoing_ the available peer `v` with the highest value of
 `priority(n, v)` from among the nodes in `neighbors(n)`.  Echoing a
-peer `v` means merging any valid values from `v`'s `votes` and
-`accepted` sets to one's own `votes` set.  However, values rejected by
-the higher-layer application's validity function are ignored and not
-merged.
+peer `v` means merging any valid values from `v`'s `voted` and
+`accepted` sets to one's own `voted` set.
 
-The validity function must not depend on state that can permanently
-differ across nodes.  By way of example, it is okay to reject values
-that are syntactically ill-formed, that are semantically incompatible
-with the previous slot's value, that contain invalid digital
-signatures, that contain timestamps in the future, or that specify
-upgrades to unknown versions of the protocol.  By contrast, the
-application cannot reject values that are incompatible with the
-results of a DNS query or some dynamically retrieved TLS certificate,
-as different nodes could see different results when doing such
-queries.
+XXX - expand `voted` with only the 10 values with lowest Gi hash in
+any given round to avoid blowing out the message size?
+
+Note that when echoing nominations, nodes must exclude and neither
+vote for nor accept values rejected by the higher-layer application's
+validity function.  This validity function must not depend on state
+that can permanently differ across nodes.  By way of example, it is
+okay to reject values that are syntactically ill-formed, that are
+semantically incompatible with the previous slot's value, that contain
+invalid digital signatures, that contain timestamps in the future, or
+that specify upgrades to unknown versions of the protocol.  By
+contrast, the application cannot reject values that are incompatible
+with the results of a DNS query or some dynamically retrieved TLS
+certificate, as different nodes could see different results when doing
+such queries.
 
 Nodes must not send an `SCPNomination` message until at least one of
-the `votes` or `accepted` fields is non-empty.  When these fields are
+the `voted` or `accepted` fields is non-empty.  When these fields are
 both empty, a node that has the highest priority among its neighbors
 in the current round (and hence should be echoing its own votes) adds
-the higher-layer software's input value to its `votes` field.  Nodes
+the higher-layer software's input value to its `voted` field.  Nodes
 that do not have the highest priority wait to hear `SCPNomination`
 messages from the nodes whose nominations they are echoing.
 
 If a particular valid value `x` reaches quorum threshold in the
 messages sent by peers (meaning that every node in a quorum contains
-`x` either in the `votes` or the `accepted` field), then the node at
-which this happens moves `x` from its `votes` field to its `accepted`
+`x` either in the `voted` or the `accepted` field), then the node at
+which this happens moves `x` from its `voted` field to its `accepted`
 field and broadcasts a new `SCPNomination` message.  Similarly, if `x`
 reaches blocking threshold in a node's peers' `accepted` field
 (meaning every one of a node's quorum slices contains at least one
 node with `x` in its `accepted` field), then the node adds `x` to its
-own `accepted` field (removing it from `votes` if applicable).  These
+own `accepted` field (removing it from `voted` if applicable).  These
 two cases correspond to the two conditions for entering the `accepted`
 state in (#fig:voting).
 
-A node finishes the NOMINATION phase whenever any value `x` reaches
-quorum threshold in the `accepted` fields.  Following the terminology
-of (#federated-voting), this condition corresponds to when the node
-confirms `x` as nominated.  A node that has finished the NOMINATION
-phase stops adding new values to its `votes` set.  However, the node
-continues adding new values to `accepted` as appropriate.  Doing so
-may lead to more values becoming confirmed nominated in the
-background.
+A node stops adding any new values to its `voted` set as soon as any
+value `x` reaches quorum threshold in the `accepted` fields.
+Following the terminology of (#federated-voting), this condition
+corresponds to when the node confirms `x` as nominated.  Note,
+however, that the node continues adding new values to `accepted` as
+appropriate.  Doing so may lead to more values becoming confirmed
+nominated even after the `voted` set is closed to new values.
 
-Round `n` lasts for `2+n` seconds, after which, if the NOMINATION
-phase has not finished, a node proceeds to round `n+1`.  Note that a
-node continues to echo votes from the highest priority neighbor in
-prior rounds as well as the current round.  In particular, a node
-continues expanding its `votes` field with values nominated by highest
-priority neighbors from prior rounds even when those values were added
-after the end of the round.
+A node always begins nomination in round `1`.  Round `n` lasts for
+`1+n` seconds, after which, if no value has been confirmed nominated,
+the node proceeds to round `n+1`.  A node continues to echo votes from
+the highest priority neighbor in prior rounds as well as the current
+round.  In particular, until any value is confirmed nominated, a node
+continues expanding its `voted` field with values nominated by highest
+priority neighbors from prior rounds even when the values appeared
+after the end of those prior rounds.
 
-XXX - expand `votes` with only the 10 values with lowest SHA-256 hash
-in any given round to avoid blowing out the message size?
+As defined in the next two sections, the NOMINATION phase ends when a
+node has confirmed `prepare(b)` for some any ballot `b`, as this is
+the point at which the nomination outcome no longer influences the
+protocol.  Until this point, a node must continue to transmit
+`SCPNomination` messages as well as to expand its `accepted` set (even
+if after `voted` is closed because some value has been confirmed
+nominated).
 
 ## Ballots
 
-After completing the NOMINATION phase (meaning after at least one
-candidate value is confirmed nominated), a node moves through three
-phases of balloting: PREPARE, COMMIT, and EXTERNALIZE.  Balloting
-employs federated voting to chose between _commit_ and _abort_
-statements for ballots.  A ballot is a pair, consisting of a counter
-and candidate value:
+Once there is a candidate on which to try to reach consensus, a node
+moves through three phases of balloting:  PREPARE, COMMIT, and
+EXTERNALIZE.  Balloting employs federated voting to chose between
+_commit_ and _abort_ statements for ballots.  A ballot is a pair
+consisting of a counter and candidate value:
 
 ~~~~~ {.xdr}
 // Structure representing ballot <n, x>
@@ -549,10 +564,9 @@ We use the notation `<n, x>` to represent a ballot with `counter == n`
 and `value == x`.
 
 Ballots are totally ordered with `counter` more significant than
-`value`.  Hence, we write `b1 < b2` to mean that either `b1.counter <
-b2.counter` or `b1.counter == b2.counter && b1.value < b2.value`.
-(Values are compared lexicographically as a strings of unsigned
-octets.)
+`value`.  Hence, we write `b1 < b2` to mean that either `(b1.counter <
+b2.counter)` or `(b1.counter == b2.counter && b1.value < b2.value)`.
+Values are compared lexicographically as a strings of unsigned octets.
 
 The protocol moves through federated voting on successively higher
 ballots until nodes confirm `commit b` for some ballot `b`, at which
@@ -564,8 +578,9 @@ two restrictions on voting:
 1. A node cannot vote for both `commit b` and `abort b` on the same
    ballot (the two outcomes are contradictory), and
 
-2. A node may not vote for `commit b` for any ballot `b` unless it has
-   confirmed `abort` for every lesser ballot with a different value.
+2. A node may not vote for or accept `commit b` for any ballot `b`
+   unless it has confirmed `abort` for every lesser ballot with a
+   different value.
 
 The second condition requires voting to abort large numbers of ballots
 before voting to commit a ballot `b`.  We call this _preparing_ ballot
@@ -584,12 +599,13 @@ abort statements.
   _confirm_ messages for every `abort` statement in `prepare(b)`.
 
 Using this terminology, a node must confirm `prepare(b)` before
-issuing a _vote_ message for the statement `commit b`.
+issuing a _vote_ or _accept_ message for the statement `commit b`.
 
 ## Prepare messages
 
 The first phase of balloting is the PREPARE phase.  During this phase,
-nodes send the following message:
+as soon as a node has a valid candidate value (see the rules for
+`ballot.value` below), it begins sending the following message:
 
 ~~~~~ {.xdr}
 struct SCPPrepare
@@ -612,7 +628,8 @@ voting messages:
 * If `cCounter != 0`: `vote commit <n, ballot.value>` for every
   `cCounter <= n <= hCounter`
 
-Note that to be valid, an `SCPPrepare` message must satisfy:
+Note that to be valid, an `SCPPrepare` message must satisfy the
+following conditions:
 
 * If `prepared != NULL`, then `prepared <= ballot`,
 * If `preparedPrime != NULL`, then `prepared != NULL` and
@@ -667,14 +684,31 @@ messages as follows.
 
 `ballot.value`
 : Each time the ballot counter is changed, the value is also
-  recomputed as follows:  If any ballot has been confirmed prepared,
-  then `ballot.value` is taken to to be `h.value` for the highest
-  confirmed prepared ballot `h`.  Otherwise (if no such `h` exists),
-  the value is taken as the output of the deterministic combining
-  function applied to all confirmed nominated values.  Note that the
-  set of confirmed nominated values may continue to grow in the
-  background during balloting, so `ballot.value` may change even if no
-  ballots are confirmed prepared.
+  recomputed as follows:
+
+    * If any ballot has been confirmed prepared, then `ballot.value`
+      is taken to to be `h.value` for the highest confirmed prepared
+      ballot `h`.  (Note that once this is the case, the node can stop
+      sending `SCPNomination` messages, as `h.value` supersedes any
+      output of the nomination protocol.)
+
+    * Otherwise (if no such `h` exists), if one or more values are
+      confurmed nominated, then `ballot.value` is taken as the output
+      of the deterministic combining function applied to all confirmed
+      nominated values.  Note that because the NOMINATION and PREPARE
+      phases run concurrently, the set of confirmed nominated values
+      may continue to grow during balloting, changing `ballot.value`
+      even if no ballots are confirmed prepared.
+
+    * Otherwise, if no value ballot is confirmed prepared and no value
+      is confirmed nominated, but the node has accepted a ballot
+      prepared (because `prepare(b)` meets blocking threshold for some
+      ballot `b`), then `ballot.value` is taken as the value of the
+      highest such accepted prepared ballot.
+
+    * Otherwise, if no value is confirmed nominated and no value is
+      accepted prepared, then a node cannot yet send an `SCPPrepare`
+      message and must continue sending only `SCPNomination` messages.
 
 `prepared`
 : The highest accepted prepared ballot not exceeding the `ballot`
