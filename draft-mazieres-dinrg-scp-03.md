@@ -227,10 +227,10 @@ subsections that follow.
 
 The protocol goes through four phases:  NOMINATION, PREPARE, COMMIT,
 and EXTERNALIZE.  The NOMINATION and PREPARE phases run concurrently
-(though PREPARE's messages are sent earlier and it ends before PREPARE
-ends).  The COMMIT and EXTERNALIZE phrases are exclusive, with COMMIT
-occurring immediately after PREPARE and EXTERNALIZE immediately after
-COMMIT.
+(though NOMINATIONS's messages are sent earlier and it ends before
+PREPARE ends).  The COMMIT and EXTERNALIZE phrases are exclusive, with
+COMMIT occurring immediately after PREPARE and EXTERNALIZE immediately
+after COMMIT.
 
 ## Federated voting
 
@@ -519,12 +519,13 @@ two cases correspond to the two conditions for entering the `accepted`
 state in (#fig:voting).
 
 A node stops adding any new values to its `voted` set as soon as any
-value `x` reaches quorum threshold in the `accepted` fields.
-Following the terminology of (#federated-voting), this condition
-corresponds to when the node confirms `x` as nominated.  Note,
-however, that the node continues adding new values to `accepted` as
-appropriate.  Doing so may lead to more values becoming confirmed
-nominated even after the `voted` set is closed to new values.
+value `x` reaches quorum threshold in the `accepted` fields of
+received `SCPNomination` messages.  Following the terminology of
+(#federated-voting), this condition corresponds to when the node
+confirms `x` as nominated.  Note, however, that the node continues
+adding new values to `accepted` as appropriate.  Doing so may lead to
+more values becoming confirmed nominated even after the `voted` set is
+closed to new values.
 
 A node always begins nomination in round `1`.  Round `n` lasts for
 `1+n` seconds, after which, if no value has been confirmed nominated,
@@ -693,7 +694,7 @@ messages as follows.
       output of the nomination protocol.)
 
     * Otherwise (if no such `h` exists), if one or more values are
-      confurmed nominated, then `ballot.value` is taken as the output
+      confirmed nominated, then `ballot.value` is taken as the output
       of the deterministic combining function applied to all confirmed
       nominated values.  Note that because the NOMINATION and PREPARE
       phases run concurrently, the set of confirmed nominated values
