@@ -7,7 +7,7 @@
 % workgroup = ""
 % keyword = ["consensus"]
 %
-% date = 2018-05-25T00:00:00Z
+% date = 2018-06-12T00:00:00Z
 %
 % [[author]]
 % initials="N."
@@ -701,11 +701,11 @@ messages as follows.
       may continue to grow during balloting, changing `ballot.value`
       even if no ballots are confirmed prepared.
 
-    * Otherwise, if no value ballot is confirmed prepared and no value
-      is confirmed nominated, but the node has accepted a ballot
-      prepared (because `prepare(b)` meets blocking threshold for some
-      ballot `b`), then `ballot.value` is taken as the value of the
-      highest such accepted prepared ballot.
+    * Otherwise, if no ballot is confirmed prepared and no value is
+      confirmed nominated, but the node has accepted a ballot prepared
+      (because `prepare(b)` meets blocking threshold for some ballot
+      `b`), then `ballot.value` is taken as the value of the highest
+      such accepted prepared ballot.
 
     * Otherwise, if no value is confirmed nominated and no value is
       accepted prepared, then a node cannot yet send an `SCPPrepare`
@@ -713,11 +713,14 @@ messages as follows.
 
 `prepared`
 : The highest accepted prepared ballot not exceeding the `ballot`
-  field, or NULL if no ballot has been accepted prepared.  (Note the
-  only condition in which the highest accepted prepared ballot might
-  exceed `ballot` is the corner case in which a higher counter reaches
-  blocking threshold but `ballot.counter` is at its temporary
-  maximum.)
+  field, or NULL if no ballot has been accepted prepared.  In the
+  event that `ballot == <1, x>` and the highest prepared ballot is has
+  value `y > x` (as can happen if `prepare(<1, y>)` reaches blocking
+  threshold), the sender sets `prepared` (or `preparedPrime` if
+  appropriate) to `<0,y>` to ensure `prepared < ballot`.  Hence, even
+  though `ballot.counter` can never be 0, `prepared.counter` can be.
+  If `<0,y>` is the highest confirmed prepared ballot, then the next
+  `ballot.value` becomes be `y`.
 
 `preparedPrime`
 : The highest accepted prepared ballot such that `preparedPrime <
@@ -841,6 +844,33 @@ The fields are set as follows:
 `hCounter`
 : The counter of the highest confirmed committed ballot.
 
+## Summary of phases
+
+(#tab:phases) summarizes the phases of SCP for each slot.  The
+NOMINATION and PREPARE phases begin concurrently.  However, a node
+initially does not send `SCPNomination` messages but only listens for
+ballot messages in case `prepare(b)` reaches blocking threshold for
+some ballot `b`.  The COMMIT and EXTERNALIZE phases then run in turn
+after PREPARE ends.  A node may externalize (act upon) a value as soon
+as it enters the EXTERNALIZE phase.
+
+The point of `SCPExternalize` messages is to help straggling nodes
+catch up more quickly.  As such, the EXTERNALIZE phase never ends.
+Rather, a node should archive a `SCPExternalize` message for as long
+as it retains slot state.
+
+
+{#tab:phases}
+| Phase | Begin | End  |
+|------:|:------|:-----|
+| NOMINATION | previous slot externalized and 5 seconds have elapsed since NOMINATION ended for that slot | Value is confirmed nominated or confirm `prepare(b)` for some ballot `b` |
+|
+| PREPARE | Begin with NOMINATION, but send `SCPPrepare` only once some value confirmed nominated or accept `prepare(b)` for some ballot b | accept `commit b` for some ballot `b` |
+|
+| COMMIT | accept `commit b` for some ballot `b` | confirm `commit b` |
+|
+| EXTERNALIZE | confirm `commit b` for some ballot `b` | never |
+
 ## Message envelopes
 
 In order to provide full context for each signed message, all signed
@@ -896,8 +926,8 @@ The Stellar development foundation supported development of the
 protocol and produced the first production deployment of SCP.  The
 IRTF DIN group including Dirk Kutscher, Sydney Li, Colin Man, Melinda
 Shore, and Jean-Luc Watson helped with the framing and motivation for
-this specification.  We also thank Bob Glickstein for feedback on this
-draft.
+this specification.  We also thank Bob Glickstein for finding bugs in
+drafts of this document and offering many useful suggestions.
 
 {{reference.building-blocks.xml}}
 {{reference.flp.xml}}
