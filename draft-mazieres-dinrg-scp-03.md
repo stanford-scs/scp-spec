@@ -541,8 +541,7 @@ node has confirmed `prepare(b)` for some any ballot `b`, as this is
 the point at which the nomination outcome no longer influences the
 protocol.  Until this point, a node must continue to transmit
 `SCPNomination` messages as well as to expand its `accepted` set (even
-if after `voted` is closed because some value has been confirmed
-nominated).
+if `voted` is closed because some value has been confirmed nominated).
 
 ## Ballots
 
@@ -714,13 +713,13 @@ messages as follows.
 `prepared`
 : The highest accepted prepared ballot not exceeding the `ballot`
   field, or NULL if no ballot has been accepted prepared.  In the
-  event that `ballot == <1, x>` and the highest prepared ballot is has
+  event that `ballot == <1, x>` and the highest prepared ballot has
   value `y > x` (as can happen if `prepare(<1, y>)` reaches blocking
   threshold), the sender sets `prepared` (or `preparedPrime` if
   appropriate) to `<0,y>` to ensure `prepared < ballot`.  Hence, even
   though `ballot.counter` can never be 0, `prepared.counter` can be.
   If `<0,y>` is the highest confirmed prepared ballot, then the next
-  `ballot.value` becomes be `y`.
+  `ballot.value` becomes `y`.
 
 `preparedPrime`
 : The highest accepted prepared ballot such that `preparedPrime <
@@ -848,26 +847,26 @@ The fields are set as follows:
 
 (#tab:phases) summarizes the phases of SCP for each slot.  The
 NOMINATION and PREPARE phases begin concurrently.  However, a node
-initially does not send `SCPNomination` messages but only listens for
-ballot messages in case `prepare(b)` reaches blocking threshold for
-some ballot `b`.  The COMMIT and EXTERNALIZE phases then run in turn
-after PREPARE ends.  A node may externalize (act upon) a value as soon
-as it enters the EXTERNALIZE phase.
+initially does not send `SCPPrepare` messages but only listens for
+ballot messages in case `accept prepare(b)` reaches blocking threshold
+for some ballot `b`.  The COMMIT and EXTERNALIZE phases then run in
+turn after PREPARE ends.  A node may externalize (act upon) a value as
+soon as it enters the EXTERNALIZE phase.
 
 The point of `SCPExternalize` messages is to help straggling nodes
 catch up more quickly.  As such, the EXTERNALIZE phase never ends.
-Rather, a node should archive a `SCPExternalize` message for as long
+Rather, a node should archive an `SCPExternalize` message for as long
 as it retains slot state.
 
 
 {#tab:phases}
 | Phase | Begin | End  |
 |------:|:------|:-----|
-| NOMINATION | previous slot externalized and 5 seconds have elapsed since NOMINATION ended for that slot | Value is confirmed nominated or confirm `prepare(b)` for some ballot `b` |
+| NOMINATION | previous slot externalized and 5 seconds have elapsed since NOMINATION ended for that slot | some value is confirmed nominated or some ballot is confirmed prepared |
 |
-| PREPARE | Begin with NOMINATION, but send `SCPPrepare` only once some value confirmed nominated or accept `prepare(b)` for some ballot b | accept `commit b` for some ballot `b` |
+| PREPARE | begin with NOMINATION, but send `SCPPrepare` only once some value confirmed nominated or accept `prepare(b)` for some ballot b | accept `commit b` for some ballot `b` |
 |
-| COMMIT | accept `commit b` for some ballot `b` | confirm `commit b` |
+| COMMIT | accept `commit b` for some ballot `b` | confirm `commit b` for some ballot `b` |
 |
 | EXTERNALIZE | confirm `commit b` for some ballot `b` | never |
 
