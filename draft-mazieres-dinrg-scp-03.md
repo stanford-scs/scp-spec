@@ -712,14 +712,17 @@ messages as follows.
 
 `prepared`
 : The highest accepted prepared ballot not exceeding the `ballot`
-  field, or NULL if no ballot has been accepted prepared.  In the
-  event that `ballot == <1, x>` and the highest prepared ballot has
-  value `y > x` (as can happen if `prepare(<1, y>)` reaches blocking
-  threshold), the sender sets `prepared` (or `preparedPrime` if
-  appropriate) to `<0,y>` to ensure `prepared < ballot`.  Hence, even
-  though `ballot.counter` can never be 0, `prepared.counter` can be.
-  If `<0,y>` is the highest confirmed prepared ballot, then the next
-  `ballot.value` becomes `y`.
+  field, or NULL if no ballot has been accepted prepared.  Recall that
+  ballots with equal counters are totally ordered by the value.
+  Hence, if `ballot = <n, x>` and the highest prepared ballot is `<n,
+  y>` where `x < y`, then the `prepared` field in sent messages must
+  be set to `<n-1, y>` instead of `<n, y>`, as the latter would exceed
+  `ballot`.  In the event that `n = 1`, the prepared field may be set
+  to `<0, y>`, meaning 0 is a valid `prepared.counter` even though it
+  is not a valid `ballot.counter`.  It is possible to confirm
+  `prepare(<0, y>)`, in which case the next `ballot.value` is set to
+  `y`.  However, it is not possible to vote to commit a ballot with
+  counter 0.
 
 `preparedPrime`
 : The highest accepted prepared ballot such that `preparedPrime <
