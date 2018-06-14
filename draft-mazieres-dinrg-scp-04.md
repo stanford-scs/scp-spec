@@ -392,19 +392,19 @@ recursively, another k-of-n set.
 ~~~~~ {.xdr}
 // supports things like: A,B,C,(D,E,F),(G,H,(I,J,K,L))
 // only allows 2 levels of nesting
-struct SCPQuorumSet
+struct SCPSlices
 {
     uint32 threshold;            // the k in k-of-n
     PublicKey validators<>;
-    SCPQuorumSet1 innerSets<>;
+    SCPSlices1 innerSets<>;
 };
-struct SCPQuorumSet1
+struct SCPSlices1
 {
     uint32 threshold;            // the k in k-of-n
     PublicKey validators<>;
-    SCPQuorumSet2 innerSets<>;
+    SCPSlices2 innerSets<>;
 };
-struct SCPQuorumSet2
+struct SCPSlices2
 {
     uint32 threshold;            // the k in k-of-n
     PublicKey validators<>;
@@ -430,7 +430,7 @@ threshold depends only on the local node's quorum slices and hence
 does not require a recursive check on other nodes like step #3 above.)
 
 As described in (#message-envelopes), every protocol message is paired
-with a cryptographic hash of the sender's `SCPQuorumSet` and digitally
+with a cryptographic hash of the sender's `SCPSlices` and digitally
 signed.  Inner protocol messages described in the next few sections
 should be understood to be received alongside such a quorum slice
 specification and digital signature.
@@ -894,7 +894,7 @@ struct SCPStatement
 {
     NodeID nodeID;      // v (node signing message)
     uint64 slotIndex;   // i
-    Hash quorumSetHash; // hash of serialized SCPQuorumSet
+    Hash quorumSetHash; // hash of serialized SCPSlices
 
     union switch (SCPStatementType type)
     {
@@ -926,10 +926,11 @@ safe.
 
 The Stellar development foundation supported development of the
 protocol and produced the first production deployment of SCP.  The
-IRTF DIN group including Dirk Kutscher, Sydney Li, Colin Man, Melinda
-Shore, and Jean-Luc Watson helped with the framing and motivation for
-this specification.  We also thank Bob Glickstein for finding bugs in
-drafts of this document and offering many useful suggestions.
+IRTF DIN group including Dirk Kutscher, Sydney Li, Colin Man, Piers
+Powlesland, Melinda Shore, and Jean-Luc Watson helped with the framing
+and motivation for this specification.  We also thank Bob Glickstein
+for finding bugs in drafts of this document and offering many useful
+suggestions.
 
 {{reference.building-blocks.xml}}
 {{reference.flp.xml}}
