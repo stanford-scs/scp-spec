@@ -741,8 +741,9 @@ messages as follows.
 
 `cCounter`
 : The value `cCounter` is maintained based on an internally-maintained
-  _commit ballot_ `c`, initially `NULL`.  `cCounter` is 0 while `c` is
-  `NULL` and is `c.counter` otherwise.  `c` is updated as follows:
+  _commit ballot_ `c`, initially `NULL`.  `cCounter` is 0 while `c ==
+  NULL` or `hCounter == 0`, and is `c.counter` otherwise.  `c` is
+  updated as follows:
 
     * If either `(prepared > c && prepared.value != c.value)` or
       `(preparedPrime > c && preparedPrime.value != c.value)`, then
