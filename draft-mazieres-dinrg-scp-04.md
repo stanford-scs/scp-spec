@@ -185,22 +185,23 @@ quorums to which they do not belong themselves.)
 
 SCP produces a series of output _values_ for consecutively numbered
 _slots_.  At the start of a slot, higher-layer software on each node
-supplies a candidate input value.  SCP's goal is to ensure that
-non-faulty nodes agree on one or a combination of nodes' input values
-for the slot's output.  5 seconds after completing one slot, the
-protocol runs again for the next slot.
+supplies a candidate input value.  Nodes then exchange protocol
+messages to agree on one or a combination of nodes' input values as
+the slot's output value.  After a pause to assemble new input values,
+the process repeats for the next slot, with a 5-second interval
+between slots.
 
 A value typically encodes a set of actions to apply to a replicated
 state machine.  During the pause between slots, nodes accumulate the
-next set of actions, thus amortizing the cost of consensus over
+next set of actions, amortizing the cost of consensus on one slot over
 arbitrarily many individual state machine operations.
 
 In practice, only one or a small number of nodes' input values
 actually affect the output value for any given slot.  As discussed in
 (#nomination), which nodes' input values to use depends on a
-cryptographic hash of the slot number, output history, and node public
-keys.  A node's chances of affecting the output value depend on how
-often it appears in other nodes' quorum slices.
+cryptographic hash of the slot number and node public keys.  A node's
+chances of affecting the output value depend on how often it appears
+in other nodes' quorum slices.
 
 From SCP's perspective, values are just opaque byte arrays whose
 interpretation is left to higher-layer software.  However, SCP
