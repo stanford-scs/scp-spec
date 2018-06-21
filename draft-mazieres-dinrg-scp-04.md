@@ -615,7 +615,7 @@ struct SCPPrepare
     SCPBallot *prepared;      // p
     SCPBallot *preparedPrime; // p'
     uint32 hCounter;          // h.counter or 0 if h == NULL
-    uint32 cCounter;          // c.counter or 0 if c == NULL
+    uint32 cCounter;          // c.counter or 0 if !c || !hCounter
 };
 ~~~~~
 
@@ -750,8 +750,8 @@ messages as follows.
       `(preparedPrime > c && preparedPrime.value != c.value)`, then
       reset `c = NULL`.
 
-    *  If `c == NULL` and `hCounter == ballot.counter` (meaning
-       `ballot` is confirmed prepared), then set `c` to `ballot`.
+    * If `c == NULL` and `hCounter == ballot.counter` (meaning
+      `ballot` is confirmed prepared), then set `c` to `ballot`.
 
 A node leaves the PREPARE phase and proceeds to the COMMIT phase when
 there is some ballot `b` for which the node confirms `prepare(b)` and
