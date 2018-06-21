@@ -198,7 +198,7 @@ arbitrarily many individual state machine operations.
 
 In practice, only one or a small number of nodes' input values
 actually affect the output value for any given slot.  As discussed in
-(#nomination), which nodes' input values to use depends on a
+(#nominate-message), which nodes' input values to use depends on a
 cryptographic hash of the slot number and node public keys.  A node's
 chances of affecting the output value depend on how often it appears
 in other nodes' quorum slices.
@@ -226,12 +226,12 @@ voting with quorum slices is termed _federated voting_.  We describe
 federated voting next, then detail protocol messages in the
 subsections that follow.
 
-The protocol goes through four phases:  NOMINATION, PREPARE, COMMIT,
-and EXTERNALIZE.  The NOMINATION and PREPARE phases run concurrently
-(though NOMINATIONS's messages are sent earlier and it ends before
-PREPARE ends).  The COMMIT and EXTERNALIZE phrases are exclusive, with
-COMMIT occurring immediately after PREPARE and EXTERNALIZE immediately
-after COMMIT.
+The protocol goes through four phases:  NOMINATE, PREPARE, COMMIT, and
+EXTERNALIZE.  The NOMINATE and PREPARE phases run concurrently (though
+NOMINATE's messages are sent earlier and it ends before PREPARE ends).
+The COMMIT and EXTERNALIZE phrases are exclusive, with COMMIT
+occurring immediately after PREPARE and EXTERNALIZE immediately after
+COMMIT.
 
 ## Federated voting
 
@@ -436,15 +436,15 @@ signed.  Inner protocol messages described in the next few sections
 should be understood to be received alongside such a quorum slice
 specification and digital signature.
 
-## Nomination
+## Nominate message
 
-For each slot, the SCP protocol begins in a NOMINATION phase whose
-goal is to devise one or more candidate output values for the
-consensus protocol.  In this phase, nodes send nomination messages
-comprising a monotonically growing set of values:
+For each slot, the SCP protocol begins in a NOMINATE phase, whose goal
+is to devise one or more candidate output values for the consensus
+protocol.  In this phase, nodes send nomination messages comprising a
+monotonically growing set of values:
 
 ~~~~~ {.xdr}
-struct SCPNomination
+struct SCPNominate
 {
     Value voted<>;      // X
     Value accepted<>;   // Y
@@ -458,9 +458,9 @@ eligible for both sets is placed only in the `accepted` set.
 nominate.  Each node progresses through a series of nomination
 _rounds_ in which it may increase the set of values in its own `voted`
 field by adding the contents of the `voted` and `accepted` fields of
-`SCPNomination` messages received from a growing set of peers.  In
-round `n` of slot `i`, each node determines an additional peer whose
-nominated values it should incorporate in its own `SCPNomination`
+`SCPNominate` messages received from a growing set of peers.  In round
+`n` of slot `i`, each node determines an additional peer whose
+nominated values it should incorporate in its own `SCPNominate`
 message as follows:
 
 * Let `Gi(m) = SHA-256(i || m)`, where `||` denotes the concatenation
@@ -499,19 +499,19 @@ with the results of a DNS query or some dynamically retrieved TLS
 certificate, as different nodes could see different results when doing
 such queries.
 
-Nodes must not send an `SCPNomination` message until at least one of
-the `voted` or `accepted` fields is non-empty.  When these fields are
-both empty, a node that has the highest priority among its neighbors
-in the current round (and hence should be echoing its own votes) adds
-the higher-layer software's input value to its `voted` field.  Nodes
-that do not have the highest priority wait to hear `SCPNomination`
-messages from the nodes whose nominations they are echoing.
+Nodes must not send an `SCPNominate` message until at least one of the
+`voted` or `accepted` fields is non-empty.  When these fields are both
+empty, a node that has the highest priority among its neighbors in the
+current round (and hence should be echoing its own votes) adds the
+higher-layer software's input value to its `voted` field.  Nodes that
+do not have the highest priority wait to hear `SCPNominate` messages
+from the nodes whose nominations they are echoing.
 
 If a particular valid value `x` reaches quorum threshold in the
 messages sent by peers (meaning that every node in a quorum contains
 `x` either in the `voted` or the `accepted` field), then the node at
 which this happens moves `x` from its `voted` field to its `accepted`
-field and broadcasts a new `SCPNomination` message.  Similarly, if `x`
+field and broadcasts a new `SCPNominate` message.  Similarly, if `x`
 reaches blocking threshold in a node's peers' `accepted` field
 (meaning every one of a node's quorum slices contains at least one
 node with `x` in its `accepted` field), then the node adds `x` to its
@@ -521,7 +521,7 @@ state in (#fig:voting).
 
 A node stops adding any new values to its `voted` set as soon as any
 value `x` reaches quorum threshold in the `accepted` fields of
-received `SCPNomination` messages.  Following the terminology of
+received `SCPNominate` messages.  Following the terminology of
 (#federated-voting), this condition corresponds to when the node
 confirms `x` as nominated.  Note, however, that the node continues
 adding new values to `accepted` as appropriate.  Doing so may lead to
@@ -537,11 +537,11 @@ continues expanding its `voted` field with values nominated by highest
 priority neighbors from prior rounds even when the values appeared
 after the end of those prior rounds.
 
-As defined in the next two sections, the NOMINATION phase ends when a
+As defined in the next two sections, the NOMINATE phase ends when a
 node has confirmed `prepare(b)` for some any ballot `b`, as this is
 the point at which the nomination outcome no longer influences the
 protocol.  Until this point, a node must continue to transmit
-`SCPNomination` messages as well as to expand its `accepted` set (even
+`SCPNominate` messages as well as to expand its `accepted` set (even
 if `voted` is closed because some value has been confirmed nominated).
 
 ## Ballots
@@ -602,7 +602,7 @@ abort statements.
 Using this terminology, a node must confirm `prepare(b)` before
 issuing a _vote_ or _accept_ message for the statement `commit(b)`.
 
-## Prepare messages
+## Prepare message
 
 The first phase of balloting is the PREPARE phase.  During this phase,
 as soon as a node has a valid candidate value (see the rules for
@@ -690,13 +690,13 @@ messages as follows.
     * If any ballot has been confirmed prepared, then `ballot.value`
       is taken to to be `h.value` for the highest confirmed prepared
       ballot `h`.  (Note that once this is the case, the node can stop
-      sending `SCPNomination` messages, as `h.value` supersedes any
+      sending `SCPNominate` messages, as `h.value` supersedes any
       output of the nomination protocol.)
 
     * Otherwise (if no such `h` exists), if one or more values are
       confirmed nominated, then `ballot.value` is taken as the output
       of the deterministic combining function applied to all confirmed
-      nominated values.  Note that because the NOMINATION and PREPARE
+      nominated values.  Note that because the NOMINATE and PREPARE
       phases run concurrently, the set of confirmed nominated values
       may continue to grow during balloting, changing `ballot.value`
       even if no ballots are confirmed prepared.
@@ -709,7 +709,7 @@ messages as follows.
 
     * Otherwise, if no value is confirmed nominated and no value is
       accepted prepared, then a node cannot yet send an `SCPPrepare`
-      message and must continue sending only `SCPNomination` messages.
+      message and must continue sending only `SCPNominate` messages.
 
 `prepared`
 : The highest accepted prepared ballot not exceeding the `ballot`
@@ -760,7 +760,7 @@ mid-protocol, it would suffice to accept `commit(b)`.  Also waiting to
 confirm `prepare(b)` makes it easier to recover from liveness failures
 by removing Byzantine faulty nodes from quorum slices.)
 
-## Commit messages
+## Commit message
 
 In the COMMIT phase, a node has accepted `commit(b)` for some ballot
 `b`, and must confirm that statement to act on the value in
@@ -816,7 +816,7 @@ accepted `commit(h)`.  (No value is included in messages since
 As soon as a node confirms `commit(b)` for any ballot `b`, it moves to
 the EXTERNALIZE phase.
 
-## Externalize messages
+## Externalize message
 
 A node enters the EXTERNALIZE phase when it confirms `commit(b)` for
 any ballot `b`.  As soon as this happens, SCP outputs `b.value` as the
@@ -851,7 +851,7 @@ The fields are set as follows:
 ## Summary of phases
 
 (#tab:phases) summarizes the phases of SCP for each slot.  The
-NOMINATION and PREPARE phases begin concurrently.  However, a node
+NOMINATE and PREPARE phases begin concurrently.  However, a node
 initially does not send `SCPPrepare` messages but only listens for
 ballot messages in case `accept prepare(b)` reaches blocking threshold
 for some ballot `b`.  The COMMIT and EXTERNALIZE phases then run in
@@ -867,9 +867,9 @@ as it retains slot state.
 {#tab:phases}
 | Phase | Begin | End  |
 |------:|:------|:-----|
-| NOMINATION | previous slot externalized and 5 seconds have elapsed since NOMINATION ended for that slot | some ballot is confirmed prepared |
+| NOMINATE | previous slot externalized and 5 seconds have elapsed since NOMINATE ended for that slot | some ballot is confirmed prepared |
 |
-| PREPARE | begin with NOMINATION, but send `SCPPrepare` only once some value confirmed nominated or accept `prepare(b)` for some ballot b | accept `commit(b)` for some ballot `b` |
+| PREPARE | begin with NOMINATE, but send `SCPPrepare` only once some value confirmed nominated or accept `prepare(b)` for some ballot b | accept `commit(b)` for some ballot `b` |
 |
 | COMMIT | accept `commit(b)` for some ballot `b` | confirm `commit(b)` for some ballot `b` |
 |
@@ -908,7 +908,7 @@ struct SCPStatement
     case SCP_ST_EXTERNALIZE:
         SCPExternalize externalize;
     case SCP_ST_NOMINATE:
-        SCPNomination nominate;
+        SCPNominate nominate;
     }
     pledges;
 };
