@@ -1,13 +1,13 @@
 % Title = "The Stellar Consensus Protocol (SCP)"
 % abbrev = "scp"
 % category = "exp"
-% docName = "draft-mazieres-dinrg-scp-03"
+% docName = "draft-mazieres-dinrg-scp-04"
 % ipr= "trust200902"
 % area = "Internet"
 % workgroup = ""
 % keyword = ["consensus"]
 %
-% date = 2018-06-13T00:00:00Z
+% date = 2018-06-21T00:00:00Z
 %
 % [[author]]
 % initials="N."
@@ -569,16 +569,16 @@ b2.counter)` or `(b1.counter == b2.counter && b1.value < b2.value)`.
 Values are compared lexicographically as a strings of unsigned octets.
 
 The protocol moves through federated voting on successively higher
-ballots until nodes confirm `commit b` for some ballot `b`, at which
+ballots until nodes confirm `commit(b)` for some ballot `b`, at which
 point consensus terminates and outputs `b.value` for the slot.  To
 ensure that only one value can be chosen for a slot and that the
 protocol cannot get stuck if individual ballots get stuck, there are
 two restrictions on voting:
 
-1. A node cannot vote for both `commit b` and `abort b` on the same
+1. A node cannot vote for both `commit(b)` and `abort(b)` on the same
    ballot (the two outcomes are contradictory), and
 
-2. A node may not vote for or accept `commit b` for any ballot `b`
+2. A node may not vote for or accept `commit(b)` for any ballot `b`
    unless it has confirmed `abort` for every lesser ballot with a
    different value.
 
@@ -589,7 +589,7 @@ abort statements.
 
 * `prepare(b)` encodes an `abort` statement for every ballot less than
   `b` containing a value other than `b.value`, i.e.,
-  `prepare(b) = { abort b1 | b1 < b AND b1.value != b.value }`.
+  `prepare(b) = { abort(b1) | b1 < b AND b1.value != b.value }`.
 
 * `vote prepare(b)` stands for a set of _vote_ messages for every
   `abort` statement in `prepare(b)`.
@@ -599,7 +599,7 @@ abort statements.
   _confirm_ messages for every `abort` statement in `prepare(b)`.
 
 Using this terminology, a node must confirm `prepare(b)` before
-issuing a _vote_ or _accept_ message for the statement `commit b`.
+issuing a _vote_ or _accept_ message for the statement `commit(b)`.
 
 ## Prepare messages
 
@@ -625,7 +625,7 @@ voting messages:
 * If `prepared != NULL`: `accept prepare(prepared)`
 * If `preparedPrime != NULL`: `accept prepare(preparedPrime)`
 * If `hCounter != 0`: `confirm prepare(<hCounter, ballot.value>)`
-* If `cCounter != 0`: `vote commit <n, ballot.value>` for every
+* If `cCounter != 0`: `vote commit(<n, ballot.value>)` for every
   `cCounter <= n <= hCounter`
 
 Note that to be valid, an `SCPPrepare` message must satisfy the
@@ -754,14 +754,14 @@ messages as follows.
 
 A node leaves the PREPARE phase and proceeds to the COMMIT phase when
 there is some ballot `b` for which the node confirms `prepare(b)` and
-accepts `commit b`.  (If nodes never changed quorum slice
-mid-protocol, it would suffice to accept `commit b`.  Also waiting to
+accepts `commit(b)`.  (If nodes never changed quorum slice
+mid-protocol, it would suffice to accept `commit(b)`.  Also waiting to
 confirm `prepare(b)` makes it easier to recover from liveness failures
 by removing Byzantine faulty nodes from quorum slices.)
 
 ## Commit messages
 
-In the COMMIT phase, a node has accepted `commit b` for some ballot
+In the COMMIT phase, a node has accepted `commit(b)` for some ballot
 `b`, and must confirm that statement to act on the value in
 `b.counter`.  A node sends the following message in this phase:
 
@@ -779,11 +779,11 @@ The message conveys the following federated vote messages, where
 `infinity` is 2^{32} (a value greater than any ballot counter
 representable in serialized form):
 
-* `accept commit <n, ballot.value>` for every `cCounter <= n <= hCounter`
+* `accept commit(<n, ballot.value>)` for every `cCounter <= n <= hCounter`
 * `vote-or-accept prepare(<infinity, ballot.value>)`
 * `accept prepare(<preparedCounter, ballot.value>)`
 * `confirm prepare(<hCounter, ballot.value>)`
-* `vote commit <n, ballot.value>` for every `n >= cCounter`
+* `vote commit(<n, ballot.value>)` for every `n >= cCounter`
 
 A node computes the fields in the `SCPCommit` messages it sends as
 follows:
@@ -804,20 +804,20 @@ only the counter is sent in the COMMIT phase.
 
 `cCounter`
 : The counter of the lowest ballot `c` for which the node has accepted
-`commit c`.  (No value is included in messages since `c.value ==
+`commit(c)`.  (No value is included in messages since `c.value ==
 ballot.value`.)
 
 `hCounter`
 : The counter of the highest ballot `h` for which the node has
-accepted `commit h`.  (No value is included in messages since `h.value
-== ballot.value`.)
+accepted `commit(h)`.  (No value is included in messages since
+`h.value == ballot.value`.)
 
-As soon as a node confirms `commit b` for any ballot `b`, it moves to
+As soon as a node confirms `commit(b)` for any ballot `b`, it moves to
 the EXTERNALIZE phase.
 
 ## Externalize messages
 
-A node enters the EXTERNALIZE phase when it confirms `commit b` for
+A node enters the EXTERNALIZE phase when it confirms `commit(b)` for
 any ballot `b`.  As soon as this happens, SCP outputs `b.value` as the
 value of the current slot.  In order to help other nodes achieve
 consensus on the slot more quickly, a node reaching this phase also
@@ -834,8 +834,8 @@ struct SCPExternalize
 An `SCPExternalize` message conveys the following federated voting
 messages:
 
-* `accept commit <n, commit.value>` for every `n >= commit.counter`
-* `confirm commit <n, commit.value>` for every
+* `accept commit(<n, commit.value>)` for every `n >= commit.counter`
+* `confirm commit(<n, commit.value>)` for every
   `commit.counter <= n <= hCounter`
 * `confirm prepare(<infinity, commit.value>)`
 
@@ -866,13 +866,14 @@ as it retains slot state.
 {#tab:phases}
 | Phase | Begin | End  |
 |------:|:------|:-----|
-| NOMINATION | previous slot externalized and 5 seconds have elapsed since NOMINATION ended for that slot | some value is confirmed nominated or some ballot is confirmed prepared |
+| NOMINATION | previous slot externalized and 5 seconds have elapsed since NOMINATION ended for that slot | some ballot is confirmed prepared |
 |
-| PREPARE | begin with NOMINATION, but send `SCPPrepare` only once some value confirmed nominated or accept `prepare(b)` for some ballot b | accept `commit b` for some ballot `b` |
+| PREPARE | begin with NOMINATION, but send `SCPPrepare` only once some value confirmed nominated or accept `prepare(b)` for some ballot b | accept `commit(b)` for some ballot `b` |
 |
-| COMMIT | accept `commit b` for some ballot `b` | confirm `commit b` for some ballot `b` |
+| COMMIT | accept `commit(b)` for some ballot `b` | confirm `commit(b)` for some ballot `b` |
 |
-| EXTERNALIZE | confirm `commit b` for some ballot `b` | never |
+| EXTERNALIZE | confirm `commit(b)` for some ballot `b` | slot state garbage-collected |
+Table: Phases of SCP for a slot
 
 ## Message envelopes
 
