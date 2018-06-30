@@ -1,7 +1,7 @@
 % Title = "The Stellar Consensus Protocol (SCP)"
 % abbrev = "scp"
 % category = "exp"
-% docName = "draft-mazieres-dinrg-scp-04"
+% docName = "draft-mazieres-dinrg-scp-05"
 % ipr= "trust200902"
 % area = "Internet"
 % workgroup = ""
