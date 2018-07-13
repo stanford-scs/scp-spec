@@ -838,7 +838,7 @@ messages:
 * `accept commit(<n, commit.value>)` for every `n >= commit.counter`
 * `confirm commit(<n, commit.value>)` for every
   `commit.counter <= n <= hCounter`
-* `confirm prepare(<infinity, commit.value>)`
+* `accept prepare(<infinity, commit.value>)`
 
 The fields are set as follows:
 
