@@ -581,7 +581,8 @@ two restrictions on voting:
 
 2. A node may not vote for or accept `commit(b)` for any ballot `b`
    unless it has confirmed `abort` for every lesser ballot with a
-   different value.
+   different value or already accepted `commit(b')` for some `b' < b`
+   with `b'.value == b.value`.
 
 The second condition requires voting to abort large numbers of ballots
 before voting to commit a ballot `b`.  We call this _preparing_ ballot
