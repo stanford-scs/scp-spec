@@ -229,9 +229,8 @@ subsections that follow.
 The protocol goes through four phases:  NOMINATE, PREPARE, COMMIT, and
 EXTERNALIZE.  The NOMINATE and PREPARE phases run concurrently (though
 NOMINATE's messages are sent earlier and it ends before PREPARE ends).
-The COMMIT and EXTERNALIZE phrases are exclusive, with COMMIT
-occurring immediately after PREPARE and EXTERNALIZE immediately after
-COMMIT.
+The COMMIT and EXTERNALIZE phases are exclusive, with COMMIT occurring
+immediately after PREPARE and EXTERNALIZE immediately after COMMIT.
 
 ## Federated voting
 
@@ -419,7 +418,7 @@ when three things hold:
 
 1. `v` itself has issued (digitally signed) the message,
 2. The number of nodes in `validators` who have signed `m` plus the
-   number `innerSets` that (recursively) meet this condition is at
+   number of `innerSets` that (recursively) meet this condition is at
    least `k`, and
 3. These three conditions apply (recursively) at some combination of
    nodes sufficient for condition #2.
