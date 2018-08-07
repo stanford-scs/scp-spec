@@ -7,7 +7,7 @@
 % workgroup = ""
 % keyword = ["consensus"]
 %
-% date = 2018-07-19T00:00:00Z
+% date = 2018-08-07T00:00:00Z
 %
 % [[author]]
 % initials="N."
@@ -471,7 +471,9 @@ message as follows:
 
 * Define the set of nodes `neighbors(n)` as the set of nodes v for
   which `Gi(1 || n || v) < 2^{256} * weight(v)`, where `1` and `n` are
-  both 32-bit XDR `int` values.
+  both 32-bit XDR `int` values.  Note that a node is always its own
+  neighbor because conceptually a node belongs to all of its own
+  quorum slices.
 
 * Define `priority(n, v)` as `Gi(2 || n || v)`, where `2` and `n` are
   both 32-bit XDR `int` values.
