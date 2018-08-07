@@ -7,7 +7,7 @@
 % workgroup = ""
 % keyword = ["consensus"]
 %
-% date = 2018-06-29T00:00:00Z
+% date = 2018-07-19T00:00:00Z
 %
 % [[author]]
 % initials="N."
@@ -839,6 +839,7 @@ messages:
 * `confirm commit(<n, commit.value>)` for every
   `commit.counter <= n <= hCounter`
 * `accept prepare(<infinity, commit.value>)`
+* `confirm prepare(<hCounter, commit.value>)`
 
 The fields are set as follows:
 
