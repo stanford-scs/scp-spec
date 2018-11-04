@@ -17,7 +17,7 @@ else
 RUN_XML2RFC = xml2rfc $(XML2RFCARGS)
 endif
 
-DRAFTS = draft-mazieres-dinrg-scp-05.md
+DRAFTS = draft-mazieres-dinrg-scp-06.md
 XMLS = $(DRAFTS:.md=.xml)
 OUTPUTS = $(DRAFTS:.md=.html) $(DRAFTS:.md=.txt)
 CLEANFILES = *~ $(OUTPUTS) $(XMLS)
