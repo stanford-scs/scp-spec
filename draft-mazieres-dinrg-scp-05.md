@@ -7,7 +7,7 @@
 % workgroup = ""
 % keyword = ["consensus"]
 %
-% date = 2018-08-07T00:00:00Z
+% date = 2018-11-04T00:00:00Z
 %
 % [[author]]
 % initials="N."
@@ -97,7 +97,7 @@ each of its members.
 
 Various aspects of Internet infrastructure depend on irreversible and
 transparent updates to data sets such as authenticated mappings
-[cite Li-Man-Watson draft].  Examples include public key certificates
+[@?I-D.watson-dinrg-delmap].  Examples include public key certificates
 and revocations, transparency logs [@?RFC6962], preload lists for HSTS
 [@?RFC6797] and HPKP [@?RFC7469], and IP address delegation
 [@?I-D.paillisse-sidrops-blockchain].
@@ -145,17 +145,18 @@ messages in SCP.
 This section describes the configuration and input/output values of
 the consensus protocol.
 
-## Configuration
+## Slice infrastructures
 
-Each participant or _node_ in the SCP protocol has a digital signature
-key and is named by the corresponding public key, which we term a
-`NodeID`.
+The SCP protocol achieves consensus on what we call a _slice
+infrastructure_, defined by a set of _nodes_ and and, for each node, a
+set of _quorum slices_ that determine quorum membership in a
+decentralized way.  Each _node_ in has a digital signature key and is
+named by the corresponding public key, which we term a `NodeID`.
 
-Each node also selects one or more sets of nodes (each of which
-includes itself) called _quorum slices_.  A quorum slice represents a
-large or important enough set of peers that the node selecting the
-quorum slice believes the slice collectively speaks for the whole
-network.
+Each node choses one or more quorum slices, which are sets of nodes
+that all include the node itself.  A quorum slice represents a large
+or important enough set of peers that the node selecting the quorum
+slice believes the slice collectively speaks for the whole network.
 
 A _quorum_ is a non-empty set of nodes containing at least one quorum
 slice of each of its members.  For instance, suppose `v1` has the
@@ -246,10 +247,9 @@ guarantees two things:
    guarantee safety for the two nodes (i.e., quorum intersection for
    the two nodes holds despite ill-behaved nodes).
 
-2. If a node that is guaranteed safety by #1 confirms a statement `a`,
-   and that node is a member of one or more quorums consisting
-   entirely of well-behaved nodes, then eventually every member of
-   every such quorum will also confirm `a`.
+2. If a quorum `I` is guaranteed safety by #1 even when all nodes in
+   `!I` are malicious, and one node in `I` confirms a statement `a`,
+   then eventually every member of `I` will also confirm `a`.
 
 Intuitively, these conditions are key to ensuring agreement among
 nodes as well as a weak form of liveness (the non-blocking property
@@ -332,6 +332,14 @@ nodes confirm `a` more efficiently by pruning their quorum search at
            +---->|  voted !a |
                  +-----------+
 Figure: Federated voting process
+
+Note several important invariants.  A node may not vote for two
+contradictory statements or accept two contradictory statements.
+Moreover, a node may not vote for a statement that contradicts a
+message it has already accepted (which could lead to accepting a
+contradictory statement).  However, a node is allowed to vote for one
+statement and then accept a contradictory statement when a blocking
+threshold of accept messages contradicts the vote.
 
 ## Basic types
 
@@ -613,11 +621,11 @@ as soon as a node has a valid candidate value (see the rules for
 ~~~~~ {.xdr}
 struct SCPPrepare
 {
-    SCPBallot ballot;         // b
-    SCPBallot *prepared;      // p
-    SCPBallot *preparedPrime; // p'
-    uint32 hCounter;          // h.counter or 0 if h == NULL
-    uint32 cCounter;          // c.counter or 0 if !c || !hCounter
+    SCPBallot ballot;        // current & highest prepare vote
+    SCPBallot *prepared;     // highest accepted prepared ballot
+    uint32 aCounter;         // lowest non-aborted ballot counter or 0
+    uint32 hCounter;         // h.counter or 0 if h == NULL
+    uint32 cCounter;         // c.counter or 0 if !c || !hCounter
 };
 ~~~~~
 
@@ -626,7 +634,8 @@ voting messages:
 
 * `vote-or-accept prepare(ballot)`
 * If `prepared != NULL`: `accept prepare(prepared)`
-* If `preparedPrime != NULL`: `accept prepare(preparedPrime)`
+* If `aCounter != 0`: `accept abort(b)` for every `b` with `b.counter
+  < aCounter`
 * If `hCounter != 0`: `confirm prepare(<hCounter, ballot.value>)`
 * If `cCounter != 0`: `vote commit(<n, ballot.value>)` for every
   `cCounter <= n <= hCounter`
@@ -634,9 +643,10 @@ voting messages:
 Note that to be valid, an `SCPPrepare` message must satisfy the
 following conditions:
 
-* If `prepared != NULL`, then `prepared <= ballot`,
-* If `preparedPrime != NULL`, then `prepared != NULL` and
-  `preparedPrime < prepared`, and
+* If `prepared != NULL`, then `prepared <= ballot` and `aCounter <=
+  prepared.counter`,
+
+* If `prepared == NULL`, then `aCounter == 0`, and
 * `cCounter <= hCounter <= ballot.counter`.
 
 Based on the federated vote messages received, each node keeps track
@@ -727,12 +737,15 @@ messages as follows.
   `y`.  However, it is not possible to vote to commit a ballot with
   counter 0.
 
-`preparedPrime`
-: The highest accepted prepared ballot such that `preparedPrime <
-  prepared` and `preparedPrime.value != prepared.value`, or NULL if
-  there is no such ballot.  Note that together, `prepared` and
-  `preparedPrime` concisely encode all `abort` statements (below
-  `ballot`) that the sender has accepted.
+`aCounter`
+: The lowest counter such that all ballots with lower counters have
+  been accepted aborted.  This value is set whenever `prepared.value`
+  changes, since the definition of prepare implies that all ballots
+  below the lesser of two prepared ballots have been aborted.
+  Specifically, if the value of `prepared` just changed from
+  `oldPrepared` where `prepared.value != oldPrepared.value`, then
+  `aCounter` is set to `oldPrepared.counter` if `oldPrepared.value <
+  prepared.value`, and `oldPrepared.counter+1` otherwise.
 
 `hCounter`
 : If `h` is the highest confirmed prepared ballot and `h.value ==
@@ -749,11 +762,17 @@ messages as follows.
   updated as follows:
 
     * If either `(prepared > c && prepared.value != c.value)` or
-      `(preparedPrime > c && preparedPrime.value != c.value)`, then
-      reset `c = NULL`.
+      `(aCounter > c.counter)`, then reset `c = NULL`.
 
     * If `c == NULL` and `hCounter == ballot.counter` (meaning
       `ballot` is confirmed prepared), then set `c` to `ballot`.
+
+    Note these rules preserve the invariant that a node cannot vote
+    for contradictory statements (namely committing and aborting the
+    same ballot) by conservatively assuming a node may have voted to
+    abort anything below `ballot`. Hence, whenever `c` changes, it can
+    either change to `NULL` or to `ballot`, but is never set to
+    anything below the current `ballot`.
 
 A node leaves the PREPARE phase and proceeds to the COMMIT phase when
 there is some ballot `b` for which the node confirms `prepare(b)` and
@@ -934,7 +953,8 @@ The Stellar development foundation supported development of the
 protocol and produced the first production deployment of SCP.  The
 IRTF DIN group including Dirk Kutscher, Sydney Li, Colin Man, Piers
 Powlesland, Melinda Shore, and Jean-Luc Watson helped with the framing
-and motivation for this specification.  We also thank Bob Glickstein
+and motivation for this specification.  The mobilecoin team
+contributed the `aCounter` optimization.  We also thank Bob Glickstein
 for finding bugs in drafts of this document and offering many useful
 suggestions.
 
