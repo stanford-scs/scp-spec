@@ -660,9 +660,13 @@ messages as follows.
   `value` is updated when and only when `counter` changes.
 
 `ballot.counter`
-:  The counter is set according to the following rules:
+: The counter is set according to the following rules, in all cases if
+  setting the counter would not result in setting a value for
+  `ballot.value`, then setting the counter must be delayed until
+  setting the counter would result in setting a value for
+  `ballot.value`:
 
-    * Upon entering the PREPARE phase, the `counter` field is
+    * After entering the PREPARE phase, the `counter` field is
       initialized to 1.
 
     * When a node sees messages from a quorum to which it belongs such
