@@ -805,7 +805,7 @@ representable in serialized form):
 * `vote-or-accept prepare(<infinity, ballot.value>)`
 * `accept prepare(<preparedCounter, ballot.value>)`
 * `confirm prepare(<hCounter, ballot.value>)`
-* `vote commit(<n, ballot.value>)` for every `n >= cCounter`
+* `vote commit(<n, ballot.value>)` for every `n >= hCounter`
 
 A node computes the fields in the `SCPCommit` messages it sends as
 follows:
